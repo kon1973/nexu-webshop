@@ -139,7 +139,7 @@ export default function Footer({ settings }: FooterProps) {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-          <p>&copy; {new Date().getFullYear()} NEXU Webshop. Minden jog fenntartva. (v1.0.1)</p>
+          <p>&copy; {new Date().getFullYear()} NEXU Webshop. Minden jog fenntartva. (v1.0.2)</p>
           <div className="flex gap-6">
             <Link href="/privacy" className="hover:text-gray-300">Adatvédelem</Link>
             <Link href="/cookies" className="hover:text-gray-300">Sütik</Link>
