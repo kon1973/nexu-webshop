@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Banner" ADD COLUMN     "linkType" TEXT NOT NULL DEFAULT 'BUTTON',
+ADD COLUMN     "location" TEXT NOT NULL DEFAULT 'HOME';
