@@ -18,7 +18,7 @@ export async function DELETE(
 
     await deleteBannerService(params.id)
 
-    // revalidateTag(CACHE_TAGS.banners)
+    revalidateTag(CACHE_TAGS.banners, {})
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -40,7 +40,7 @@ export async function PUT(
     const body = await req.json()
     const banner = await updateBannerService(params.id, body)
 
-    // revalidateTag(CACHE_TAGS.banners)
+    revalidateTag(CACHE_TAGS.banners, {})
 
     return NextResponse.json(banner)
   } catch (error) {

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { calculateLoyaltyDiscountAmount } from '@/lib/loyalty'
+import { logInventoryChange } from '@/lib/services/inventoryService'
 
 export const CartItemSchema = z.object({
   id: z.number(),
@@ -53,17 +54,45 @@ export async function createOrderService(data: CreateOrderInput) {
   // Fetch products
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
-    select: { id: true, name: true, price: true, stock: true, image: true },
+    select: { id: true, name: true, price: true, salePrice: true, saleStartDate: true, saleEndDate: true, stock: true, image: true },
   })
   
   // Fetch variants
   const variants = await prisma.productVariant.findMany({
       where: { id: { in: variantIds } },
-      select: { id: true, productId: true, price: true, stock: true, images: true }
+      select: { id: true, productId: true, price: true, salePrice: true, saleStartDate: true, saleEndDate: true, stock: true, images: true }
   })
 
   const productById = new Map(products.map((product: any) => [product.id, product]))
   const variantById = new Map(variants.map((variant: any) => [variant.id, variant]))
+
+  // Helper to calculate effective price
+  const getEffectivePrice = (product: any, variant: any | null) => {
+    const now = new Date()
+    let price = product.price
+    let salePrice = product.salePrice
+    let saleStart = product.saleStartDate
+    let saleEnd = product.saleEndDate
+
+    if (variant) {
+      price = variant.price
+      // Reset sale info for variant, only use if variant has its own sale
+      salePrice = null
+      saleStart = null
+      saleEnd = null
+      
+      if (variant.salePrice) {
+        salePrice = variant.salePrice
+        saleStart = variant.saleStartDate
+        saleEnd = variant.saleEndDate
+      }
+    }
+
+    if (salePrice && (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now)) {
+      return salePrice
+    }
+    return price
+  }
 
   // Validate existence
   for (const item of cartItems) {
@@ -101,12 +130,9 @@ export async function createOrderService(data: CreateOrderInput) {
   let subtotal = 0
   for (const item of cartItems) {
       const product = productById.get(item.id)! as any
-      let price = product.price
+      const variant = item.variantId ? variantById.get(item.variantId)! as any : null
       
-      if (item.variantId) {
-          const variant = variantById.get(item.variantId)! as any
-          price = variant.price
-      }
+      const price = getEffectivePrice(product, variant)
       
       subtotal += price * item.quantity
   }
@@ -189,14 +215,24 @@ export async function createOrderService(data: CreateOrderInput) {
     if (couponId) {
       const freshCoupon = await tx.coupon.findUnique({ where: { id: couponId } })
       if (!freshCoupon || !freshCoupon.isActive) throw new Error('INVALID_COUPON')
-      if (freshCoupon.usageLimit !== null && freshCoupon.usedCount >= freshCoupon.usageLimit) {
-        throw new Error('COUPON_LIMIT_REACHED')
+      
+      if (freshCoupon.usageLimit !== null) {
+        const result = await tx.coupon.updateMany({
+          where: { 
+            id: couponId, 
+            usedCount: { lt: freshCoupon.usageLimit } 
+          },
+          data: { usedCount: { increment: 1 } },
+        })
+        if (result.count === 0) {
+          throw new Error('COUPON_LIMIT_REACHED')
+        }
+      } else {
+        await tx.coupon.update({
+          where: { id: couponId },
+          data: { usedCount: { increment: 1 } },
+        })
       }
-
-      await tx.coupon.update({
-        where: { id: couponId },
-        data: { usedCount: { increment: 1 } },
-      })
     }
 
     // Create order
@@ -219,11 +255,8 @@ export async function createOrderService(data: CreateOrderInput) {
         items: {
           create: cartItems.map((item) => {
             const product = productById.get(item.id)! as any
-            let price = product.price
-            if (item.variantId) {
-              const variant = variantById.get(item.variantId)! as any
-              price = variant.price
-            }
+            const variant = item.variantId ? variantById.get(item.variantId)! as any : null
+            const price = getEffectivePrice(product, variant)
 
             return {
               productId: item.id,
@@ -244,6 +277,19 @@ export async function createOrderService(data: CreateOrderInput) {
         }
       }
     })
+
+    // Log inventory changes
+    for (const item of cartItems) {
+      await logInventoryChange({
+        productId: item.id,
+        variantId: item.variantId,
+        change: -item.quantity,
+        reason: 'ORDER_PLACED',
+        referenceId: newOrder.id,
+        userId: userId,
+        tx: tx
+      })
+    }
 
     // Save address if requested
     if (saveAddress && userId && addressData) {

@@ -4,8 +4,9 @@ import { useMemo } from 'react'
 import { useCompare } from '@/context/CompareContext'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
-import { Trash2, ShoppingCart, X, ArrowLeft, Check } from 'lucide-react'
+import { Trash2, ShoppingCart, X, ArrowLeft, Check, Package } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { getImageUrl } from '@/lib/image'
 
 export default function ComparePage() {
   const { compareList, removeFromCompare, clearCompare } = useCompare()
@@ -83,10 +84,10 @@ export default function ComparePage() {
                       <X size={14} />
                     </button>
                     <div className="aspect-square bg-[#1a1a1a] rounded-xl mb-4 flex items-center justify-center text-4xl overflow-hidden">
-                      {product.image && (product.image.startsWith('http') || product.image.startsWith('/')) ? (
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                      {getImageUrl(product.image) ? (
+                        <img src={getImageUrl(product.image)!} alt={product.name} className="w-full h-full object-cover" />
                       ) : (
-                        product.image
+                        <Package size={48} className="text-gray-500" />
                       )}
                     </div>
                     <Link href={`/shop/${product.id}`} className="block hover:text-purple-400 transition-colors">

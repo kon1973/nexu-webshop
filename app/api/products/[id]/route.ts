@@ -11,7 +11,7 @@ export async function DELETE(_request: Request, props: { params: Promise<{ id: s
     if (Number.isNaN(id)) return NextResponse.json({ success: false, error: 'Érvénytelen ID.' }, { status: 400 })
 
     await deleteProductService(id)
-    // revalidateTag(CACHE_TAGS.products)
+    revalidateTag(CACHE_TAGS.products, {})
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Delete error:', error)
@@ -40,7 +40,7 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
 
     const updatedProduct = await updateProductService(id, result.data)
 
-    // revalidateTag(CACHE_TAGS.products)
+    revalidateTag(CACHE_TAGS.products, {})
 
     return NextResponse.json({ success: true, product: updatedProduct })
   } catch (error) {

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, Image as ImageIcon, Save, Loader2, Upload, Edit, X } from 'lucide-react'
+import { Plus, Trash2, Image as ImageIcon, Save, Loader2, Upload, Edit, X, Package } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Banner } from '@prisma/client'
+import { getImageUrl } from '@/lib/image'
 
 export default function BannerListClient({ banners: initialBanners }: { banners: Banner[] }) {
   const [banners, setBanners] = useState<Banner[]>(initialBanners)
@@ -258,7 +259,11 @@ export default function BannerListClient({ banners: initialBanners }: { banners:
                 <div className="flex items-center gap-4">
                   {newImage && (
                     <div className="w-32 h-20 rounded-lg overflow-hidden border border-white/10">
-                      <img src={newImage} alt="Preview" className="w-full h-full object-cover" />
+                      {getImageUrl(newImage) ? (
+                        <img src={getImageUrl(newImage)!} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Package size={24} className="text-gray-500" />
+                      )}
                     </div>
                   )}
                   <label className="cursor-pointer bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
@@ -288,8 +293,12 @@ export default function BannerListClient({ banners: initialBanners }: { banners:
               key={banner.id}
               className={`bg-[#121212] border ${banner.isActive ? 'border-white/5' : 'border-red-500/20'} rounded-2xl p-4 flex flex-col md:flex-row gap-6 items-center group hover:border-white/10 transition-all`}
             >
-              <div className="w-full md:w-48 h-24 rounded-xl overflow-hidden bg-white/5 flex-shrink-0 relative">
-                <img src={banner.image} alt={banner.title} className="w-full h-full object-cover" />
+              <div className="w-full md:w-48 h-24 rounded-xl overflow-hidden bg-white/5 flex-shrink-0 relative flex items-center justify-center">
+                {getImageUrl(banner.image) ? (
+                  <img src={getImageUrl(banner.image)!} alt={banner.title} className="w-full h-full object-cover" />
+                ) : (
+                  <Package size={32} className="text-gray-500" />
+                )}
                 <div className="absolute top-1 left-1 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm">
                   {banner.location === 'SHOP' ? 'SHOP' : 'HOME'}
                 </div>

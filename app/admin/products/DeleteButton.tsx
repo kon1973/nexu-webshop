@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Trash2, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { deleteProductAction } from './actions'
 
 export default function DeleteButton({ id }: { id: number }) {
   const [isDeleting, setIsDeleting] = useState(false)
@@ -14,15 +15,13 @@ export default function DeleteButton({ id }: { id: number }) {
 
     setIsDeleting(true)
     try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: 'DELETE',
-      })
+      const res = await deleteProductAction(id)
 
-      if (res.ok) {
+      if (res.success) {
         toast.success('Termék véglegesen törölve.')
         router.refresh()
       } else {
-        toast.error('Nem sikerült a törlés.')
+        toast.error(res.error || 'Nem sikerült a törlés.')
       }
     } catch (error) {
       console.error(error)

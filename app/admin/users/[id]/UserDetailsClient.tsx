@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ArrowLeft, Mail, MapPin, Package, Star, User as UserIcon, Calendar, Shield } from 'lucide-react'
 import type { User, Address, Order, Review, Product, OrderItem } from '@prisma/client'
+import { getImageUrl } from '@/lib/image'
 
 type UserWithDetails = User & {
   addresses: Address[]
@@ -27,9 +28,9 @@ export default function UserDetailsClient({ user }: { user: UserWithDetails }) {
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-[#121212] border border-white/5 rounded-2xl p-6">
               <div className="flex flex-col items-center text-center mb-6">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold mb-4 border-4 border-[#121212] shadow-xl">
-                  {user.image ? (
-                    <img src={user.image} alt={user.name || ''} className="w-full h-full rounded-full object-cover" />
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold mb-4 border-4 border-[#121212] shadow-xl overflow-hidden">
+                  {getImageUrl(user.image) ? (
+                    <img src={getImageUrl(user.image)!} alt={user.name || ''} className="w-full h-full object-cover" />
                   ) : (
                     (user.name?.[0] || 'U').toUpperCase()
                   )}

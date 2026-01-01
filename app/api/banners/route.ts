@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const body = await req.json()
     const banner = await createBannerService(body)
 
-    // revalidateTag(CACHE_TAGS.banners)
+    revalidateTag(CACHE_TAGS.banners, {})
 
     return NextResponse.json(banner)
   } catch (error) {

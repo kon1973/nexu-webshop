@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { updateCategoryService, deleteCategoryService, CategorySchema } from '@/lib/services/categoryService'
+import { revalidatePath } from 'next/cache'
+import { CACHE_TAGS } from '@/lib/cache'
 
 export async function PATCH(
   req: Request,
@@ -22,6 +24,8 @@ export async function PATCH(
 
     const category = await updateCategoryService(params.id, result.data)
 
+    revalidatePath('/shop')
+
     return NextResponse.json(category)
   } catch (error) {
     console.error('Category update error:', error)
@@ -41,6 +45,8 @@ export async function DELETE(
     }
 
     await deleteCategoryService(params.id)
+
+    revalidatePath('/shop')
 
     return NextResponse.json({ success: true })
   } catch (error) {

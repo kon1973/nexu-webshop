@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, Filter } from 'lucide-react'
+import { Search, Filter, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 type Props = {
@@ -47,7 +47,7 @@ export default function FilterPanel({
   return (
     <>
       {/* Mobile Filter Toggle */}
-      <div className="lg:hidden sticky top-20 z-30 bg-[#0a0a0a]/80 backdrop-blur-xl pb-4 pt-2">
+      <div className="lg:hidden sticky top-[72px] z-30 bg-[#0a0a0a]/80 backdrop-blur-xl pb-4 pt-2">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="w-full flex items-center justify-center gap-2 bg-white text-black p-4 rounded-xl font-bold shadow-lg shadow-white/5 hover:bg-gray-200 transition-all active:scale-[0.98]"
@@ -68,7 +68,7 @@ export default function FilterPanel({
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-xl font-bold text-white">Szűrők</h2>
               <button onClick={() => setIsOpen(false)} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
-                <Search size={20} className="rotate-45" /> {/* Using Search icon rotated as X for now, or import X */}
+                <X size={20} />
               </button>
             </div>
             <FilterContent 

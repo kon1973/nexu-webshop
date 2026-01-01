@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     await updateSettingsService(result.data)
 
-    // revalidateTag(CACHE_TAGS.settings)
+    revalidateTag(CACHE_TAGS.settings, {})
 
     return NextResponse.json({ success: true })
   } catch (error) {

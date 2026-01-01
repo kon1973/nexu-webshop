@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, ShoppingBag, Trash2, X } from 'lucide-react'
+import { ArrowRight, ShoppingBag, Trash2, X, Package } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useSettings } from '@/context/SettingsContext'
+import { getImageUrl } from '@/lib/image'
 
 export default function CartSidebar() {
   const { cart, itemCount, removeFromCart, updateQuantity, isCartOpen, closeCart, clearCart } = useCart()
@@ -80,10 +81,10 @@ export default function CartSidebar() {
               return (
                 <div key={`${item.id}-${JSON.stringify(item.selectedOptions)}`} className="flex gap-4">
                   <div className="w-20 h-20 bg-[#0a0a0a] rounded-lg border border-white/5 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden relative">
-                    {item.image && (item.image.startsWith('http') || item.image.startsWith('/')) ? (
-                      <img src={item.image} alt={item.name} className="w-full h-full object-contain" />
+                    {getImageUrl(item.image) ? (
+                      <img src={getImageUrl(item.image)!} alt={item.name} className="w-full h-full object-contain" />
                     ) : (
-                      item.image
+                      <Package size={24} className="text-gray-500" />
                     )}
                   </div>
 

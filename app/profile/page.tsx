@@ -7,6 +7,7 @@ import ResendVerification from "./ResendVerification"
 import { getLoyaltyTier } from "@/lib/loyalty"
 import ReorderButton from "@/components/ReorderButton"
 import { Order } from "@prisma/client"
+import { getImageUrl } from "@/lib/image"
 
 export default async function ProfilePage() {
   const session = await auth()
@@ -226,8 +227,12 @@ export default async function ProfilePage() {
                       <div className="space-y-4">
                         {order.items.map((item: any) => (
                           <div key={item.id} className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center text-xl border border-white/5">
-                              {item.product?.image || '📦'}
+                            <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center text-xl border border-white/5 overflow-hidden">
+                              {getImageUrl(item.product?.image) ? (
+                                <img src={getImageUrl(item.product?.image)!} alt={item.product?.name || ''} className="w-full h-full object-cover" />
+                              ) : (
+                                <Package size={24} className="text-gray-500" />
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-white truncate">{item.product?.name || 'Törölt termék'}</p>

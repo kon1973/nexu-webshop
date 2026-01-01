@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import ShopClient from './ShopClient'
 import type { Metadata } from 'next'
 import { getProductsService } from '@/lib/services/productService'
+import { auth } from '@/lib/auth'
 
 export const metadata: Metadata = {
   title: 'Termékek',
@@ -48,6 +49,17 @@ export default async function ShopPage({
     prisma.category.findMany({ orderBy: { name: 'asc' } }),
     prisma.product.aggregate({ _max: { price: true } })
   ])
+
+  if (search) {
+    const session = await auth()
+    prisma.searchLog.create({
+      data: {
+        query: search,
+        userId: session?.user?.id,
+        resultsCount: productsData.totalCount
+      }
+    }).catch(err => console.error('Search log error:', err))
+  }
 
   const globalMaxPrice = priceAgg._max.price || 2000000
 

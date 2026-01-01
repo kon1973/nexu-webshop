@@ -28,6 +28,34 @@ export async function handleStripeWebhookService(body: string, signature: string
     throw new Error(`Webhook signature verification failed: ${error.message}`)
   }
 
+  // Idempotency: record or check event to prevent double processing
+  try {
+    const existing = await (prisma as any).webhookEvent.findUnique({ where: { eventId: event.id } })
+    if (existing) {
+      if (existing.processed) {
+        logger.info('Stripe webhook event already processed', { eventId: event.id, type: event.type })
+        return { received: true }
+      } else {
+        await (prisma as any).webhookEvent.update({
+          where: { id: existing.id },
+          data: { retryCount: existing.retryCount + 1, receivedAt: new Date() },
+        })
+      }
+    } else {
+      await (prisma as any).webhookEvent.create({
+        data: {
+          provider: 'stripe',
+          eventId: event.id,
+          type: event.type,
+          payload: event as any,
+        },
+      })
+    }
+  } catch (err) {
+    logger.error('Failed to record webhook event', { error: String(err) })
+    // Continue processing to avoid losing event handling when DB write fails
+  }
+
   if (event.type === 'payment_intent.succeeded') {
     const paymentIntent = event.data.object as Stripe.PaymentIntent
     const orderId = paymentIntent.metadata.orderId
@@ -49,6 +77,12 @@ export async function handleStripeWebhookService(body: string, signature: string
 
     if (order.status === 'paid') {
       logger.info('Order already paid', { orderId })
+      // mark processed if not marked
+      try {
+        await (prisma as any).webhookEvent.update({ where: { eventId: event.id }, data: { processed: true, processedAt: new Date() } })
+      } catch (err) {
+        logger.warn('Failed to mark webhook event processed', { error: String(err) })
+      }
       return { received: true }
     }
 
@@ -84,12 +118,32 @@ export async function handleStripeWebhookService(body: string, signature: string
     let invoiceUrl = null
     try {
       // Parse address (simplified)
-      // Assuming format: "1234 City, Street 1."
-      const parts = order.customerAddress.split(',')
-      const zipCity = parts[0].trim().split(' ')
-      const zip = zipCity[0]
-      const city = zipCity.slice(1).join(' ')
-      const street = parts.slice(1).join(',').trim()
+      // Robust parsing with fallbacks
+      let zip = '0000'
+      let city = 'Ismeretlen'
+      let street = order.customerAddress
+
+      try {
+        const parts = order.customerAddress.split(',')
+        if (parts.length > 1) {
+            const zipCity = parts[0].trim().split(' ')
+            if (zipCity.length > 1) {
+                zip = zipCity[0]
+                city = zipCity.slice(1).join(' ')
+                street = parts.slice(1).join(',').trim()
+            }
+        } else {
+            // Try regex for "1234 City Street..."
+            const match = order.customerAddress.match(/^(\d{4})\s+([^\s]+)\s+(.+)$/)
+            if (match) {
+                zip = match[1]
+                city = match[2]
+                street = match[3]
+            }
+        }
+      } catch (e) {
+          logger.warn('Address parsing failed, using fallback', { address: order.customerAddress })
+      }
 
       const invoiceResult = await createInvoice({
         orderId: order.id,
@@ -135,6 +189,7 @@ export async function handleStripeWebhookService(body: string, signature: string
           customerName: order.customerName,
           customerEmail: order.customerEmail,
           customerAddress: order.customerAddress,
+          paymentMethod: 'stripe',
           items: order.items.map((item: OrderItem) => {
               const product: any = productById.get(item.productId!)
               let name = product?.name || 'Termék'
@@ -150,7 +205,7 @@ export async function handleStripeWebhookService(body: string, signature: string
               return {
                 name: name,
                 quantity: item.quantity,
-                unitPrice: item.price,
+                unitPrice: item.price, // Price from DB
                 image: image
               }
           }),
@@ -161,6 +216,13 @@ export async function handleStripeWebhookService(body: string, signature: string
         })
     } catch (err) {
         logger.error('Email sending failed', err)
+    }
+
+    // mark processed
+    try {
+      await (prisma as any).webhookEvent.update({ where: { eventId: event.id }, data: { processed: true, processedAt: new Date() } })
+    } catch (err) {
+      logger.warn('Failed to mark webhook event processed', { error: String(err) })
     }
   }
 

@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server"
 import { registerUserService } from "@/lib/services/authService"
-import { checkRateLimit } from "@/lib/ratelimit"
 import { headers } from "next/headers"
 import { z } from "zod"
+import { enforceRateLimit, rateLimitExceededResponse } from '@/lib/enforceRateLimit'
 
 export async function POST(request: Request) {
   try {
     const ip = (await headers()).get("x-forwarded-for") ?? "127.0.0.1"
-    const { success } = await checkRateLimit(ip)
-    
-    if (!success) {
-      return NextResponse.json(
-        { success: false, error: "Túl sok kérés. Kérjük, próbáld újra később." },
-        { status: 429 }
-      )
-    }
+    const rl = await enforceRateLimit(ip, 5, 60, 'register')
+    if (!rl.success) return rateLimitExceededResponse(undefined, rl.reset)
 
     const body = await request.json()
     const result = await registerUserService(body)

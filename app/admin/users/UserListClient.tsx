@@ -6,6 +6,7 @@ import Link from 'next/link'
 import RoleSelect from './RoleSelect'
 import BanButton from './BanButton'
 import type { User } from '@prisma/client'
+import { getImageUrl } from '@/lib/image'
 
 type UserWithCount = User & {
   _count: {
@@ -62,8 +63,8 @@ export default function UserListClient({ users }: { users: UserWithCount[] }) {
                   <td className="p-4">
                     <Link href={`/admin/users/${user.id}`} className="flex items-center gap-3 group cursor-pointer">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white font-bold border border-white/10 overflow-hidden group-hover:border-purple-500 transition-colors">
-                        {user.image ? (
-                          <img src={user.image} alt={user.name || ''} className="w-full h-full object-cover" />
+                        {getImageUrl(user.image) ? (
+                          <img src={getImageUrl(user.image)!} alt={user.name || ''} className="w-full h-full object-cover" />
                         ) : (
                           (user.name?.[0] || 'U').toUpperCase()
                         )}

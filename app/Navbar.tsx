@@ -10,6 +10,8 @@ import { useFavorites } from '@/context/FavoritesContext'
 import { useCompare } from '@/context/CompareContext'
 import { useSession, signOut } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { getCategories } from '@/lib/cache'
+import { getImageUrl } from '@/lib/image'
 
 function isActivePath(pathname: string, href: string) {
   if (href === '/') return pathname === '/'
@@ -24,7 +26,16 @@ type SearchSuggestion = {
   price: number
 }
 
-export default function Navbar() {
+type Category = {
+  id: string
+  name: string
+  slug: string
+  icon?: string | null
+  color?: string | null
+  description?: string | null
+}
+
+export default function Navbar({ categories = [] }: { categories?: Category[] }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
@@ -157,10 +168,12 @@ export default function Navbar() {
                         className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
                       >
                         <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center text-lg relative overflow-hidden">
-                          {product.image.startsWith('http') || product.image.startsWith('/') ? (
-                            <Image src={product.image} alt={product.name} fill className="object-cover" sizes="40px" />
-                          ) : (
+                          {getImageUrl(product.image) ? (
+                            <Image src={getImageUrl(product.image)!} alt={product.name} fill className="object-cover" sizes="40px" />
+                          ) : product.image === '\u{1f4e6}' ? (
                             product.image
+                          ) : (
+                            <Package size={20} className="text-gray-500" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -185,23 +198,26 @@ export default function Navbar() {
 
             <div className="md:hidden">
               {isSearchOpen ? (
-                <form onSubmit={handleSearch} className="flex items-center bg-[#1a1a1a] border border-white/10 rounded-full px-3 py-1 absolute top-4 left-4 right-16 z-50">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Keresés..."
-                    className="bg-transparent border-none outline-none text-sm text-white w-full placeholder-gray-500"
-                    autoFocus
-                  />
+                <div className="absolute inset-0 bg-[#0a0a0a] z-50 flex items-center px-4 gap-2">
+                  <form onSubmit={handleSearch} className="flex-1 flex items-center bg-[#1a1a1a] border border-white/10 rounded-full px-4 py-2">
+                    <Search size={18} className="text-gray-400 mr-2" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Keresés..."
+                      className="bg-transparent border-none outline-none text-sm text-white w-full placeholder-gray-500"
+                      autoFocus
+                    />
+                  </form>
                   <button
                     type="button"
                     onClick={() => setIsSearchOpen(false)}
-                    className="ml-2 text-gray-400 hover:text-white"
+                    className="p-2 text-gray-400 hover:text-white"
                   >
-                    <X size={14} />
+                    <span className="text-sm font-medium">Mégse</span>
                   </button>
-                </form>
+                </div>
               ) : (
                 <button
                   onClick={() => setIsSearchOpen(true)}

@@ -103,7 +103,7 @@ export default function ShopClient({
         <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10 blur-3xl" />
         
         <div className="container mx-auto px-4 py-24 relative z-10 text-center">
-          <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-6">
+          <h1 className="text-4xl md:text-7xl font-black tracking-tighter mb-6">
             {currentCategory ? (
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
                 {currentCategory.name}
@@ -177,7 +177,7 @@ export default function ShopClient({
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-6">
               {products.map((product, index) => (
                 <ProductCard key={product.id} product={product} priority={index < 4} />
               ))}

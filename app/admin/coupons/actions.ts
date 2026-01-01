@@ -5,7 +5,7 @@ import { auth } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { createCouponService } from '@/lib/services/couponService'
+import { createCouponService, updateCouponService, deleteCouponService } from '@/lib/services/couponService'
 
 const CouponSchema = z.object({
   code: z.string().min(1, "Kupon kód kötelező"),
@@ -83,4 +83,67 @@ export async function createCoupon(prevState: CouponState, formData: FormData): 
 
   revalidatePath('/admin/coupons')
   redirect('/admin/coupons')
+}
+
+export async function updateCoupon(id: string, prevState: CouponState, formData: FormData): Promise<CouponState> {
+  const session = await auth()
+  if (session?.user?.role !== 'admin') {
+    return { message: 'Nincs jogosultságod ehhez a művelethez.' }
+  }
+
+  const rawProductIds = formData.getAll('productIds')
+  
+  const validatedFields = CouponSchema.safeParse({
+    code: formData.get('code'),
+    discountType: formData.get('discountType'),
+    discountValue: formData.get('discountValue'),
+    usageLimit: formData.get('usageLimit') || null,
+    expiresAt: formData.get('expiresAt') || null,
+    minOrderValue: formData.get('minOrderValue') || null,
+    categoryId: formData.get('categoryId') || null,
+    productIds: rawProductIds.map(String)
+  })
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Hibás adatok. Kérlek ellenőrizd az űrlapot.'
+    }
+  }
+
+  const { code, discountType, discountValue, usageLimit, expiresAt, minOrderValue, categoryId, productIds } = validatedFields.data
+
+  try {
+    await updateCouponService(id, {
+      code,
+      discountType,
+      discountValue,
+      usageLimit,
+      expiresAt,
+      minOrderValue,
+      categoryId,
+      productIds
+    })
+  } catch (error) {
+    console.error('Coupon update error:', error)
+    return { message: 'Hiba történt a kupon frissítésekor.' }
+  }
+
+  revalidatePath('/admin/coupons')
+  redirect('/admin/coupons')
+}
+
+export async function deleteCoupon(id: string) {
+  const session = await auth()
+  if (session?.user?.role !== 'admin') {
+    throw new Error('Nincs jogosultságod ehhez a művelethez.')
+  }
+
+  try {
+    await deleteCouponService(id)
+    revalidatePath('/admin/coupons')
+  } catch (error) {
+    console.error('Coupon delete error:', error)
+    throw new Error('Hiba történt a kupon törlésekor.')
+  }
 }

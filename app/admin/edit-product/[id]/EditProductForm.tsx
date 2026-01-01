@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Save, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Product, ProductOption, ProductVariant } from '@prisma/client'
+import { updateProductAction } from '../../products/actions'
 import { ProductBasicInfo } from '../../components/product-form/ProductBasicInfo'
 import { ProductImages } from '../../components/product-form/ProductImages'
 import { ProductVariants } from '../../components/product-form/ProductVariants'
@@ -38,7 +39,25 @@ type ProductWithDetails = Product & {
   specifications?: any
 }
 
-export default function EditProductForm({ product }: { product: ProductWithDetails }) {
+type Category = {
+  id: string
+  name: string
+}
+
+type SpecTemplate = {
+  id: string
+  name: string
+  fields: { name: string, type: 'text' | 'boolean' | 'header' }[]
+}
+
+type Props = {
+  product: ProductWithDetails
+  initialCategories: Category[]
+  initialAttributes: Attribute[]
+  initialSpecTemplates: SpecTemplate[]
+}
+
+export default function EditProductForm({ product, initialCategories, initialAttributes, initialSpecTemplates }: Props) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [images, setImages] = useState<string[]>(product.images && product.images.length > 0 ? product.images : [product.image])
@@ -46,8 +65,8 @@ export default function EditProductForm({ product }: { product: ProductWithDetai
   const [variantUploading, setVariantUploading] = useState<string | null>(null)
   
   // Attributes state
-  const [availableAttributes, setAvailableAttributes] = useState<Attribute[]>([])
-  const [categories, setCategories] = useState<{ id: string, name: string }[]>([])
+  const [availableAttributes, setAvailableAttributes] = useState<Attribute[]>(initialAttributes)
+  const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [selectedAttributeIds, setSelectedAttributeIds] = useState<string[]>([])
   const [variants, setVariants] = useState<Variant[]>([])
   const [basePrice, setBasePrice] = useState<number>(product.price)
@@ -76,14 +95,10 @@ export default function EditProductForm({ product }: { product: ProductWithDetai
   }, [salePercentage, basePrice, saleType])
 
   // Specifications state
-  const [specTemplates, setSpecTemplates] = useState<{ id: string, name: string, fields: { name: string, type: 'text' | 'boolean' | 'header' }[] }[]>([])
+  const [specTemplates, setSpecTemplates] = useState<SpecTemplate[]>(initialSpecTemplates)
   const [specifications, setSpecifications] = useState<{ key: string, value: string | boolean, type: 'text' | 'boolean' | 'header' }[]>([])
 
   useEffect(() => {
-    fetchAttributes()
-    fetchCategories()
-    fetchSpecTemplates()
-    
     // Initialize variants and attributes from product
     if (product.variants && product.variants.length > 0) {
       const mappedVariants = product.variants.map((v: ProductVariant) => ({
@@ -111,12 +126,6 @@ export default function EditProductForm({ product }: { product: ProductWithDetai
       }))
       setSpecifications(specs)
     }
-
-    if (product.options && product.options.length > 0) {
-      // We need to match product options to available attributes by name
-      // But availableAttributes are fetched async. 
-      // We can just set selectedAttributeIds based on names once attributes are loaded.
-    }
   }, [])
 
   useEffect(() => {
@@ -131,18 +140,6 @@ export default function EditProductForm({ product }: { product: ProductWithDetai
       }
     }
   }, [availableAttributes, product.options])
-
-  const fetchSpecTemplates = async () => {
-    try {
-      const res = await fetch('/api/admin/specification-templates')
-      if (res.ok) {
-        const data = await res.json()
-        setSpecTemplates(data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch spec templates', error)
-    }
-  }
 
   const applySpecTemplate = (templateId: string) => {
     const template = specTemplates.find(t => t.id === templateId)
@@ -174,30 +171,6 @@ export default function EditProductForm({ product }: { product: ProductWithDetai
     // @ts-ignore
     newSpecs[index][field] = val
     setSpecifications(newSpecs)
-  }
-
-  const fetchAttributes = async () => {
-    try {
-      const res = await fetch('/api/attributes')
-      if (res.ok) {
-        const data = await res.json()
-        setAvailableAttributes(data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch attributes', error)
-    }
-  }
-
-  const fetchCategories = async () => {
-    try {
-      const res = await fetch('/api/categories')
-      if (res.ok) {
-        const data = await res.json()
-        setCategories(data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch categories', error)
-    }
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -369,19 +342,15 @@ export default function EditProductForm({ product }: { product: ProductWithDetai
     }
 
     try {
-      const res = await fetch(`/api/products/${product.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData),
-      })
+      // @ts-ignore
+      const res = await updateProductAction(product.id, productData)
 
-      if (res.ok) {
+      if (res.success) {
         toast.success('Termék sikeresen frissítve!')
         router.push('/admin/products')
         router.refresh()
       } else {
-        const errorData = await res.json().catch(() => ({}))
-        toast.error(errorData.error || 'Hiba történt a mentéskor.')
+        toast.error(res.error || 'Hiba történt a mentéskor.')
       }
     } catch (error) {
       console.error(error)

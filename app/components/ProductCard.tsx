@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Star, Eye, ArrowLeftRight } from 'lucide-react'
+import { Star, Eye, ArrowLeftRight, Package } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useCompare } from '@/context/CompareContext'
 import FavoriteButton from './FavoriteButton'
@@ -11,6 +11,7 @@ import type { Product } from '@prisma/client'
 import { toast } from 'sonner'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { getImageUrl } from '@/lib/image'
 
 interface ProductCardProps {
   product: Product & { 
@@ -86,16 +87,18 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     }
   }
 
+  const imageUrl = getImageUrl(product.image)
+
   return (
     <>
       <div className="group relative bg-[#0a0a0a] rounded-3xl border border-white/5 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 overflow-hidden flex flex-col h-full hover:-translate-y-2">
         <Link href={`/shop/${product.id}`} className="block relative">
-          <div className="relative aspect-square bg-gradient-to-br from-[#1a1a1a] to-[#050505] flex items-center justify-center overflow-hidden p-8 group-hover:from-[#222] group-hover:to-[#0a0a0a] transition-colors duration-500">
+          <div className="relative aspect-square bg-gradient-to-br from-[#1a1a1a] to-[#050505] flex items-center justify-center overflow-hidden p-4 md:p-8 group-hover:from-[#222] group-hover:to-[#0a0a0a] transition-colors duration-500">
             <div className="w-full h-full flex items-center justify-center transform group-hover:scale-110 transition-all duration-500 drop-shadow-2xl filter group-hover:brightness-110">
-              {product.image.startsWith('http') || product.image.startsWith('/') ? (
+              {imageUrl ? (
                 <div className="relative w-full h-full">
                   <Image
-                    src={product.image}
+                    src={imageUrl}
                     alt={product.name}
                     fill
                     className="object-contain"
@@ -104,7 +107,13 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
                   />
                 </div>
               ) : (
-                <span className="text-7xl">{product.image}</span>
+                <div className="w-full h-full flex items-center justify-center text-gray-600">
+                  {product.image === '\u{1f4e6}' ? (
+                    <span className="text-7xl">{product.image}</span>
+                  ) : (
+                    <Package size={64} strokeWidth={1} />
+                  )}
+                </div>
               )}
             </div>
 
@@ -157,7 +166,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           </div>
         </Link>
 
-        <div className="p-6 flex flex-col flex-grow relative z-10">
+        <div className="p-4 md:p-6 flex flex-col flex-grow relative z-10">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-xs font-medium text-purple-400 uppercase tracking-wider">{product.category}</span>
             <div className="flex items-center gap-1">
@@ -168,10 +177,10 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           </div>
 
           <Link href={`/shop/${product.id}`} className="group-hover:text-purple-400 transition-colors duration-300">
-            <h3 className="text-lg font-bold text-white mb-2 line-clamp-2 leading-tight">{product.name}</h3>
+            <h3 className="text-base md:text-lg font-bold text-white mb-2 line-clamp-2 leading-tight">{product.name}</h3>
           </Link>
           
-          <p className="text-sm text-gray-400 line-clamp-2 mb-4 flex-grow">{product.description}</p>
+          <p className="text-xs md:text-sm text-gray-400 line-clamp-2 mb-4 flex-grow">{product.description}</p>
 
           <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between gap-4">
             <div className="flex flex-col">
@@ -180,7 +189,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
                   {product.price.toLocaleString('hu-HU')} Ft
                 </span>
               )}
-              <span className={`text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${isOnSale ? 'from-red-500 to-orange-500' : 'from-white to-gray-400'}`}>
+              <span className={`text-lg md:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${isOnSale ? 'from-red-500 to-orange-500' : 'from-white to-gray-400'}`}>
                 {currentPrice?.toLocaleString('hu-HU')} Ft
               </span>
             </div>
@@ -188,7 +197,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
             <button
               onClick={handleAddToCart}
               disabled={isOutOfStock}
-              className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 shadow-lg transform active:scale-95 ${
+              className={`px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-300 shadow-lg transform active:scale-95 ${
                 isOutOfStock
                   ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
                   : hasVariants

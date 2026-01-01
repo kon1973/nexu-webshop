@@ -121,6 +121,7 @@ model Product {
   favoritedBy Favorite[]
   cartItems  CartItem[]
   coupons    Coupon[]
+  inventoryLogs InventoryLog[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -213,6 +214,7 @@ model ProductVariant {
   images    String[] @default([])
   description String?
   cartItems   CartItem[]
+  inventoryLogs InventoryLog[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -328,4 +330,53 @@ model Setting {
   description String?
   updatedAt   DateTime @updatedAt
 }
+
+model SettingAudit {
+  id        String   @id @default(cuid())
+  key       String
+  oldValue  String?
+  newValue  String
+  author    String?  // email or userId
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([key])
+  @@index([author])
+}
+model InventoryLog {
+  id          String   @id @default(cuid())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  change      Int      // Positive for restock, negative for sale
+  reason      String   // "ORDER_PLACED", "ORDER_CANCELLED", "MANUAL_ADJUSTMENT", "RESTOCK"
+  referenceId String?  // Order ID or other reference
+  createdAt   DateTime @default(now())
+  userId      String?  // Who made the change (if manual)
+}
+
+model SearchLog {
+  id        String   @id @default(cuid())
+  query     String
+  userId    String?
+  resultsCount Int
+  createdAt DateTime @default(now())
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  provider    String   // e.g., "stripe"
+  eventId     String   @unique
+  type        String
+  payload     Json
+  processed   Boolean  @default(false)
+  processedAt DateTime?
+  receivedAt  DateTime @default(now())
+  retryCount   Int     @default(0)
+
+  @@index([provider])
+  @@index([processed])
+}
+
 

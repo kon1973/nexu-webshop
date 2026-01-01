@@ -85,6 +85,47 @@ export default async function AnalyticsPage() {
     }
   })
 
+  // 4. Search Analytics
+  const topSearchesRaw = await prisma.searchLog.groupBy({
+    by: ['query'],
+    _count: { query: true },
+    orderBy: { _count: { query: 'desc' } },
+    take: 10,
+  })
+
+  const topSearches = topSearchesRaw.map(s => ({
+    query: s.query,
+    count: s._count.query
+  }))
+
+  const zeroResultSearchesRaw = await prisma.searchLog.groupBy({
+    by: ['query'],
+    where: { resultsCount: 0 },
+    _count: { query: true },
+    orderBy: { _count: { query: 'desc' } },
+    take: 10,
+  })
+
+  const zeroResultSearches = zeroResultSearchesRaw.map(s => ({
+    query: s.query,
+    count: s._count.query
+  }))
+
+  // 5. Recent Inventory Logs
+  const recentInventoryLogsRaw = await prisma.inventoryLog.findMany({
+    take: 10,
+    orderBy: { createdAt: 'desc' },
+    include: { product: { select: { name: true } } }
+  })
+
+  const recentInventoryLogs = recentInventoryLogsRaw.map(log => ({
+    id: log.id,
+    productName: log.product.name,
+    change: log.change,
+    reason: log.reason,
+    createdAt: log.createdAt
+  }))
+
   return (
     <AnalyticsClient 
       data={{
@@ -94,7 +135,10 @@ export default async function AnalyticsPage() {
         currentRevenue,
         revenueGrowth,
         currentOrders: currentMonthRevenueAgg._count.id,
-        topProducts: topProductsWithDetails
+        topProducts: topProductsWithDetails,
+        topSearches,
+        zeroResultSearches,
+        recentInventoryLogs
       }}
     />
   )

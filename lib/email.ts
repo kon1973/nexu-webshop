@@ -20,6 +20,7 @@ export type SendOrderEmailsArgs = {
   shippingCost: number
   totalPrice: number
   invoiceUrl?: string
+  paymentMethod: string
 }
 
 export type SendOrderEmailsResult = {
@@ -202,6 +203,10 @@ function renderCustomerHtml(args: SendOrderEmailsArgs & { orderNumber: string; o
 
   const shippingLabel = args.shippingCost === 0 ? 'Ingyenes' : formatHuf(args.shippingCost)
 
+  let paymentText = 'Egyéb'
+  if (args.paymentMethod === 'cod') paymentText = 'Utánvét'
+  else if (args.paymentMethod === 'stripe') paymentText = 'Bankkártya (Stripe)'
+
   return `<!doctype html>
 <html>
   <body style="margin:0; padding:0; background:#0a0a0a; color:#ffffff; font-family: Arial, Helvetica, sans-serif;">
@@ -242,7 +247,7 @@ function renderCustomerHtml(args: SendOrderEmailsArgs & { orderNumber: string; o
 
         <div style="margin-top:16px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:16px;">
           <p style="margin:0; color:#d4d4d4; line-height:1.6;">
-            Fizet\u00E9s: jelenleg csak ut\u00E1nv\u00E9t.
+            Fizet\u00E9s m\u00F3dja: <strong>${paymentText}</strong><br/>
             Ha 5 percen bel\u00FCl nem \u00E9rkezik meg ez az email, ellen\u0151rizd a spam mapp\u00E1t is.
           </p>
         </div>
@@ -261,6 +266,10 @@ function renderCustomerText(args: SendOrderEmailsArgs & { orderNumber: string; o
 
   const shippingLabel = args.shippingCost === 0 ? 'Ingyenes' : formatHuf(args.shippingCost)
 
+  let paymentText = 'Egyéb'
+  if (args.paymentMethod === 'cod') paymentText = 'Utánvét'
+  else if (args.paymentMethod === 'stripe') paymentText = 'Bankkártya (Stripe)'
+
   return `Rendel\u00E9s visszaigazol\u00E1s - #${args.orderNumber}
 
 Szia ${args.customerName}!
@@ -274,6 +283,7 @@ ${itemsText}
 R\u00E9sz\u00F6sszeg: ${formatHuf(args.subtotal)}
 Sz\u00E1ll\u00EDt\u00E1s: ${shippingLabel}
 V\u00E9g\u00F6sszeg: ${formatHuf(args.totalPrice)}
+Fizet\u00E9s m\u00F3dja: ${paymentText}
 
 Sz\u00E1ll\u00EDt\u00E1si c\u00EDm:
 ${args.customerAddress}
@@ -285,6 +295,10 @@ function renderAdminHtml(args: SendOrderEmailsArgs & { orderNumber: string; orde
   const email = escapeHtml(args.customerEmail)
   const address = escapeHtml(args.customerAddress).replaceAll('\n', '<br />')
   const shippingLabel = args.shippingCost === 0 ? 'Ingyenes' : formatHuf(args.shippingCost)
+
+  let paymentText = 'Egyéb'
+  if (args.paymentMethod === 'cod') paymentText = 'Utánvét'
+  else if (args.paymentMethod === 'stripe') paymentText = 'Bankkártya (Stripe)'
 
   return `<!doctype html>
 <html>
@@ -324,6 +338,10 @@ function renderAdminHtml(args: SendOrderEmailsArgs & { orderNumber: string; orde
               <td style="padding:10px 0 0; color:#ffffff; font-weight:800; border-top:1px solid rgba(255,255,255,0.08);">V\u00E9g\u00F6sszeg</td>
               <td style="padding:10px 0 0; text-align:right; color:#ffffff; font-weight:900; border-top:1px solid rgba(255,255,255,0.08);">${formatHuf(args.totalPrice)}</td>
             </tr>
+            <tr>
+              <td style="padding:10px 0 0; color:#a3a3a3; border-top:1px solid rgba(255,255,255,0.08);">Fizet\u00E9s m\u00F3dja</td>
+              <td style="padding:10px 0 0; text-align:right; color:#e5e5e5; border-top:1px solid rgba(255,255,255,0.08);">${paymentText}</td>
+            </tr>
           </table>
         </div>
       </div>
@@ -339,6 +357,10 @@ function renderAdminText(args: SendOrderEmailsArgs & { orderNumber: string; orde
 
   const shippingLabel = args.shippingCost === 0 ? 'Ingyenes' : formatHuf(args.shippingCost)
 
+  let paymentText = 'Egyéb'
+  if (args.paymentMethod === 'cod') paymentText = 'Utánvét'
+  else if (args.paymentMethod === 'stripe') paymentText = 'Bankkártya (Stripe)'
+
   return `\u00DAj rendel\u00E9s \u00E9rkezett - #${args.orderNumber}
 
 V\u00E1s\u00E1rl\u00F3: ${args.customerName} <${args.customerEmail}>
@@ -353,6 +375,7 @@ ${itemsText}
 R\u00E9sz\u00F6sszeg: ${formatHuf(args.subtotal)}
 Sz\u00E1ll\u00EDt\u00E1s: ${shippingLabel}
 V\u00E9g\u00F6sszeg: ${formatHuf(args.totalPrice)}
+Fizet\u00E9s m\u00F3dja: ${paymentText}
 `
 }
 

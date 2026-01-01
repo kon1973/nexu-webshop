@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useEffect, type FormEvent } from 'react'
-import { ArrowLeft, CheckCircle, CreditCard, Loader2, Truck, MapPin, Banknote, UserPlus } from 'lucide-react'
+import { ArrowLeft, CheckCircle, CreditCard, Loader2, Truck, MapPin, Banknote, UserPlus, Package } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/context/CartContext'
 import { useSettings } from '@/context/SettingsContext'
@@ -13,6 +13,7 @@ import { Elements } from '@stripe/react-stripe-js'
 import { validateCoupon } from '@/app/cart/actions'
 import { createOrder } from './actions'
 import CheckoutForm from './CheckoutForm'
+import { getImageUrl } from '@/lib/image'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -761,10 +762,10 @@ export default function CheckoutPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-[#0a0a0a] rounded-lg flex items-center justify-center border border-white/10 text-xl overflow-hidden">
-                        {item.image && (item.image.startsWith('http') || item.image.startsWith('/')) ? (
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        {getImageUrl(item.image) ? (
+                          <img src={getImageUrl(item.image)!} alt={item.name} className="w-full h-full object-cover" />
                         ) : (
-                          item.image
+                          <Package size={16} className="text-gray-500" />
                         )}
                       </div>
                       <div>

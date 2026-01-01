@@ -1,5 +1,6 @@
 import { RefreshCw, Loader2, Upload, X, Trash2 } from 'lucide-react'
 import { type ChangeEvent } from 'react'
+import { getImageUrl } from '@/lib/image'
 
 type Attribute = {
   id: string
@@ -132,7 +133,7 @@ export function ProductVariants({
                       <div className="flex items-center gap-2">
                         {variant.image ? (
                             <div className="relative w-8 h-8 rounded overflow-hidden border border-white/10 group/img">
-                                <img src={variant.image} alt="Variant" className="w-full h-full object-cover" />
+                                <img src={getImageUrl(variant.image)!} alt="Variant" className="w-full h-full object-cover" />
                                 <button
                                     type="button"
                                     onClick={() => updateVariant(idx, 'image', '')}

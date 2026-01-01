@@ -1,29 +1,20 @@
 'use client'
 
 import { Trash2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { deleteCoupon } from './actions'
 
 export default function DeleteCouponButton({ id }: { id: string }) {
   const [isDeleting, setIsDeleting] = useState(false)
-  const router = useRouter()
 
   const handleDelete = async () => {
     if (!confirm('Biztosan törölni szeretnéd ezt a kupont?')) return
 
     setIsDeleting(true)
     try {
-      const res = await fetch(`/api/coupons/${id}`, {
-        method: 'DELETE',
-      })
-
-      if (res.ok) {
-        toast.success('Kupon törölve')
-        router.refresh()
-      } else {
-        toast.error('Hiba a törlés során')
-      }
+      await deleteCoupon(id)
+      toast.success('Kupon törölve')
     } catch (error) {
       toast.error('Hiba történt')
     } finally {

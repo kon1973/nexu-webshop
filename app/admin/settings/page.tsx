@@ -20,7 +20,7 @@ type Setting = {
   value: string
 }
 
-type Tab = 'general' | 'shop' | 'contact' | 'social' | 'integrations'
+type Tab = 'general' | 'shop' | 'contact' | 'social' | 'integrations' | 'rateLimits'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({})
@@ -82,6 +82,7 @@ export default function SettingsPage() {
     { id: 'contact', label: 'Kapcsolat', icon: Phone },
     { id: 'social', label: 'Közösségi', icon: Share2 },
     { id: 'integrations', label: 'Integrációk', icon: Code },
+    { id: 'rateLimits', label: 'Rate limit', icon: ToggleLeft },
   ]
 
   if (isLoading) {
@@ -352,6 +353,18 @@ export default function SettingsPage() {
                       STRIPE_WEBHOOK_SECRET=...
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Rate limits shortcut */}
+            {activeTab === 'rateLimits' && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <h2 className="text-xl font-bold mb-6 pb-4 border-b border-white/5">Rate limit beállítások</h2>
+                <p className="text-gray-400">Szerkesztheted a rate limit szabályokat egy dedikált oldalon. Itt gyors linkeket találsz az admin kezelőhöz és az audit naplóhoz.</p>
+                <div className="mt-4 flex gap-3">
+                  <a href="/admin/settings/rate-limits" className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl">Megnyitás</a>
+                  <a href="/admin/settings/rate-limits/audit" className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-xl">Audit napló</a>
                 </div>
               </div>
             )}

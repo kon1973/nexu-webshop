@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     const product = await createProductService(result.data)
     
-    // revalidateTag(CACHE_TAGS.products)
+    revalidateTag(CACHE_TAGS.products, {})
 
     return NextResponse.json({ success: true, product })
   } catch (error) {

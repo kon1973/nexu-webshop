@@ -75,6 +75,16 @@ export async function deleteCouponService(id: string) {
   })
 }
 
+export async function getCouponByIdService(id: string) {
+  return await prisma.coupon.findUnique({
+    where: { id },
+    include: {
+      category: true,
+      products: true
+    }
+  })
+}
+
 export async function validateCouponService(data: ValidateCouponInput) {
   const { code, cartTotal, cartItems } = data
 

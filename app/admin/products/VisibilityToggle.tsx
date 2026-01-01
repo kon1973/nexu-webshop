@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { toggleProductVisibilityAction } from './actions'
 
 type Props = {
   id: number
@@ -20,39 +21,18 @@ export default function VisibilityToggle({ id, initialIsArchived, product }: Pro
     setIsLoading(true)
     try {
       const newState = !isArchived
-      const res = await fetch(`/api/products/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...product, // We need to send other required fields because the PUT handler validates them
-          // Wait, the PUT handler validates name, category, price. 
-          // If I only send isArchived, it might fail if I don't send the others.
-          // Let's check the PUT handler again.
-          // It says: if (!name || !category || !Number.isFinite(price) || price <= 0) return 400
-          // So I MUST send these fields.
-          // This is not ideal for a simple toggle.
-          // I should probably create a specific PATCH endpoint or update the PUT to allow partial updates.
-          // But for now, I'll just send the required fields if I have them.
-          // The 'product' prop should contain them.
-          name: product.name,
-          category: product.category,
-          price: product.price,
-          stock: product.stock,
-          isArchived: newState
-        }),
-      })
+      const res = await toggleProductVisibilityAction(id, newState)
 
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Hiba történt')
+      if (!res.success) {
+        throw new Error(res.error || 'Hiba történt')
       }
 
       setIsArchived(newState)
-      toast.success(newState ? 'Termék elrejtve' : 'Termék látható')
+      toast.success(newState ? 'Termék archiválva' : 'Termék közzétéve')
       router.refresh()
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      toast.error('Nem sikerült módosítani a láthatóságot')
+      toast.error(error.message || 'Nem sikerült módosítani a láthatóságot')
     } finally {
       setIsLoading(false)
     }

@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { Calendar, User, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { getImageUrl } from '@/lib/image'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
@@ -62,10 +63,10 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               </div>
             </div>
 
-            {post.image && (
+            {getImageUrl(post.image) && (
               <div className="relative w-full aspect-video rounded-2xl overflow-hidden mb-10">
                 <Image
-                  src={post.image}
+                  src={getImageUrl(post.image)!}
                   alt={post.title}
                   fill
                   className="object-cover"

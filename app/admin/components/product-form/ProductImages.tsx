@@ -1,5 +1,6 @@
-import { Loader2, Upload, X } from 'lucide-react'
+import { Loader2, Upload, X, Package } from 'lucide-react'
 import { type ChangeEvent } from 'react'
+import { getImageUrl } from '@/lib/image'
 
 type Props = {
   images: string[]
@@ -14,8 +15,12 @@ export function ProductImages({ images, uploading, handleImageUpload, removeImag
       <h2 className="text-xl font-bold border-b border-white/10 pb-2">Képek</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {images.map((img, idx) => (
-          <div key={idx} className="relative aspect-square bg-white/5 rounded-xl overflow-hidden border border-white/10 group">
-            <img src={img} alt={`Product ${idx}`} className="w-full h-full object-cover" />
+          <div key={idx} className="relative aspect-square bg-white/5 rounded-xl overflow-hidden border border-white/10 group flex items-center justify-center">
+            {getImageUrl(img) ? (
+              <img src={getImageUrl(img)!} alt={`Product ${idx}`} className="w-full h-full object-cover" />
+            ) : (
+              <Package size={32} className="text-gray-500" />
+            )}
             <button
               type="button"
               onClick={() => removeImage(idx)}

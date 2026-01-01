@@ -1,6 +1,7 @@
 import 'server-only'
 import { prisma } from '@/lib/prisma'
 import { sendAbandonedCartEmail } from '@/lib/email'
+import { logInventoryChange } from '@/lib/services/inventoryService'
 
 export async function processAbandonedCartsService() {
   // Find carts updated > 1 hour ago and < 24 hours ago
@@ -73,4 +74,78 @@ export async function processAbandonedCartsService() {
   }
 
   return { processed: abandonedCarts.length, sent: emailsSent }
+}
+
+export async function cleanupPendingOrdersService() {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+
+  const pendingOrders = await prisma.order.findMany({
+    where: {
+      status: 'pending',
+      createdAt: {
+        lt: oneHourAgo,
+      },
+    },
+    include: {
+      items: true,
+    },
+  })
+
+  console.log(`Found ${pendingOrders.length} pending orders to cleanup`)
+
+  let cleanedUp = 0
+
+  for (const order of pendingOrders) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Restore stock
+        for (const item of order.items) {
+          if (item.variantId) {
+            await tx.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: { increment: item.quantity } },
+            })
+          } else if (item.productId) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { increment: item.quantity } },
+            })
+          }
+
+          if (item.productId) {
+            await logInventoryChange({
+                productId: item.productId,
+                variantId: item.variantId,
+                change: item.quantity,
+                reason: 'ORDER_CANCELLED',
+                referenceId: order.id,
+                tx: tx
+            })
+          }
+        }
+
+        // Restore coupon usage
+        if (order.couponCode) {
+            const coupon = await tx.coupon.findUnique({ where: { code: order.couponCode } })
+            if (coupon) {
+                await tx.coupon.update({
+                    where: { id: coupon.id },
+                    data: { usedCount: { decrement: 1 } }
+                })
+            }
+        }
+
+        // Update order status
+        await tx.order.update({
+          where: { id: order.id },
+          data: { status: 'cancelled' },
+        })
+      })
+      cleanedUp++
+    } catch (error) {
+      console.error(`Failed to cleanup order ${order.id}:`, error)
+    }
+  }
+
+  return { processed: pendingOrders.length, cleanedUp }
 }

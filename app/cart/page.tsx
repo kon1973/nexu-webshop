@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useEffect } from 'react'
-import { ArrowLeft, ArrowRight, BadgePercent, ShoppingBag, ShoppingCart, Trash2, UserPlus } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BadgePercent, ShoppingBag, ShoppingCart, Trash2, UserPlus, Package } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/context/CartContext'
 import { useSettings } from '@/context/SettingsContext'
 import { useSession } from 'next-auth/react'
 import { validateCoupon } from './actions'
+import { getImageUrl } from '@/lib/image'
 
 export default function CartPage() {
   const { cart, itemCount, removeFromCart, updateQuantity, coupon, applyCoupon, removeCoupon } = useCart()
@@ -167,10 +168,10 @@ export default function CartPage() {
                   className="bg-[#121212] border border-white/5 p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-6 hover:border-white/10 transition-colors"
                 >
                   <div className="w-24 h-24 bg-[#0a0a0a] rounded-xl flex items-center justify-center text-4xl border border-white/5 flex-shrink-0 overflow-hidden">
-                    {item.image && (item.image.startsWith('http') || item.image.startsWith('/')) ? (
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    {getImageUrl(item.image) ? (
+                      <img src={getImageUrl(item.image)!} alt={item.name} className="w-full h-full object-cover" />
                     ) : (
-                      item.image
+                      <Package size={32} className="text-gray-500" />
                     )}
                   </div>
 

@@ -9,6 +9,7 @@ import ProductDetailsClient from './ProductDetailsClient'
 import RecentlyViewed from '@/app/components/RecentlyViewed'
 import type { Review, Product } from '@prisma/client'
 import { getProductByIdService, getProductsService } from '@/lib/services/productService'
+import { getRelatedProductsService } from '@/lib/services/recommendationService'
 
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const params = await props.params
@@ -69,19 +70,7 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
     return notFound()
   }
 
-  const relatedProducts = await prisma.product.findMany({
-    where: {
-      category: product.category,
-      isArchived: false,
-      id: { not: product.id },
-    },
-    take: 4,
-    include: {
-      variants: {
-        select: { id: true },
-      },
-    },
-  })
+  const relatedProducts = await getRelatedProductsService(product.id)
 
   const siteUrl = getSiteUrl()
   const productUrl = new URL(`/shop/${product.id}`, siteUrl).toString()
@@ -141,7 +130,7 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
         {relatedProducts.length > 0 && (
           <div className="mt-20 pt-12 border-t border-white/10">
             <h2 className="text-2xl font-bold mb-8">Hasonló termékek</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
               {relatedProducts.map((relatedProduct: Product) => (
                 <ProductCard key={relatedProduct.id} product={relatedProduct} />
               ))}

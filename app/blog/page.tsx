@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, User } from 'lucide-react'
 import type { Metadata } from 'next'
+import { getImageUrl } from '@/lib/image'
 
 export const metadata: Metadata = {
   title: 'Blog - NEXU Webshop',
@@ -31,9 +32,9 @@ export default async function BlogPage() {
               className="group bg-[#121212] border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all"
             >
               <div className="relative h-48 w-full overflow-hidden">
-                {post.image ? (
+                {getImageUrl(post.image) ? (
                   <Image
-                    src={post.image}
+                    src={getImageUrl(post.image)!}
                     alt={post.title}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-500"

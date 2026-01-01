@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { createPaymentIntentService, PaymentIntentSchema } from '@/lib/services/paymentService'
+import { enforceRateLimit, rateLimitExceededResponse } from '@/lib/enforceRateLimit' 
 
 export async function POST(request: Request) {
   try {
     const session = await auth()
+    const ip = (await headers()).get("x-forwarded-for") ?? "127.0.0.1"
+    const identifier = session?.user?.id ?? ip
+    const rl = await enforceRateLimit(identifier, 20, 60, 'create-payment-intent')
+    if (!rl.success) return rateLimitExceededResponse(undefined, rl.reset)
+
     const body = await request.json()
     
     // Normalize cart items if needed (handling string/number conversions)

@@ -5,12 +5,13 @@ import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import { useRecentlyViewed } from '@/context/RecentlyViewedContext'
 import { useCompare } from '@/context/CompareContext'
-import { Check, Minus, Plus, ShoppingCart, Star, Heart, Share2, ArrowLeftRight, X, User } from 'lucide-react'
+import { Check, Minus, Plus, ShoppingCart, Star, Heart, Share2, ArrowLeftRight, X, User, Package } from 'lucide-react'
 import { toast } from 'sonner'
 import FavoriteButton from '@/app/components/FavoriteButton'
 import ShareButton from '@/app/components/ShareButton'
 import ReviewForm from '@/app/components/ReviewForm'
 import type { Product, Review } from '@prisma/client'
+import { getImageUrl } from '@/lib/image'
 
 type ProductOption = {
   id: string
@@ -226,10 +227,10 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
           <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
           {/* Display selected image */}
-          {selectedImage.startsWith('http') || selectedImage.startsWith('/') ? (
+          {getImageUrl(selectedImage) ? (
             <div className="relative w-full h-full z-10">
               <Image
-                src={selectedImage}
+                src={getImageUrl(selectedImage)!}
                 alt={product.name}
                 fill
                 className="object-contain animate-in zoom-in duration-500 group-hover:scale-110 transition-transform"
@@ -238,9 +239,7 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
               />
             </div>
           ) : (
-            <span className="text-9xl animate-in zoom-in duration-500 group-hover:scale-110 transition-transform relative z-10 select-none">
-              {selectedImage}
-            </span>
+            <Package size={128} className="text-gray-500 animate-in zoom-in duration-500 group-hover:scale-110 transition-transform relative z-10" />
           )}
 
           {product.images.length > 0 && (
@@ -269,11 +268,11 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
                   selectedImage === img ? 'border-purple-500' : 'border-transparent opacity-50 hover:opacity-100'
                 }`}
               >
-                {img.startsWith('http') || img.startsWith('/') ? (
-                  <Image src={img} alt="" fill className="object-cover" sizes="100px" />
+                {getImageUrl(img) ? (
+                  <Image src={getImageUrl(img)!} alt="" fill className="object-cover" sizes="100px" />
                 ) : (
                   <div className="w-full h-full bg-[#121212] flex items-center justify-center text-2xl">
-                    {img}
+                    <Package size={24} className="text-gray-500" />
                   </div>
                 )}
               </button>
@@ -620,7 +619,7 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
           <div className="flex items-center gap-4">
              <div className="w-12 h-12 rounded-lg bg-white p-1">
                <img 
-                 src={selectedImage.startsWith('http') ? selectedImage : '/placeholder.png'} 
+                 src={getImageUrl(selectedImage) || '/placeholder.png'} 
                  alt={product.name} 
                  className="w-full h-full object-contain" 
                />

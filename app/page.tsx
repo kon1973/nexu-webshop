@@ -1,10 +1,11 @@
 import { auth } from '@/lib/auth'
 import { Product, Category } from '@prisma/client'
 import Link from 'next/link'
-import { ArrowRight, ShieldCheck, Star, Truck, Zap } from 'lucide-react'
+import { ArrowRight, ShieldCheck, Star, Truck, Zap, Package } from 'lucide-react'
 import BannerCarousel from './components/BannerCarousel'
 import ProductCard from './components/ProductCard'
 import { getSettings, getBanners, getCategories, getFeaturedProducts, getNewArrivals } from '@/lib/cache'
+import { getImageUrl } from '@/lib/image'
 
 export default async function HomePage() {
   const settings = await getSettings()
@@ -52,7 +53,7 @@ export default async function HomePage() {
                 TÉLI LEÁRAZÁS AKTÍV
               </div>
 
-              <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
+              <h1 className="text-4xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
                 Minden tech <br />
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
                   Egy helyen.
@@ -114,10 +115,10 @@ export default async function HomePage() {
                       >
                         <div className="bg-[#121212]/90 backdrop-blur-md border border-white/10 p-4 rounded-2xl shadow-2xl flex items-center gap-4 w-72 hover:border-purple-500/30 transition-colors">
                           <div className="w-16 h-16 bg-white/5 rounded-xl flex items-center justify-center overflow-hidden relative flex-shrink-0">
-                            {product.image.startsWith('http') || product.image.startsWith('/') ? (
-                              <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
+                            {getImageUrl(product.image) ? (
+                              <img src={getImageUrl(product.image)!} alt={product.name} className="w-full h-full object-contain" />
                             ) : (
-                              <span className="text-4xl">{product.image}</span>
+                              <Package size={32} className="text-gray-500" />
                             )}
                           </div>
                           <div className="min-w-0">
@@ -177,7 +178,7 @@ export default async function HomePage() {
       <section id="categories" className="py-20 bg-[#0f0f0f]">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">Fedezd fel kategóriáinkat</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-6">
             {categories.map((cat: Category) => (
               <Link
                 key={cat.id}
@@ -208,7 +209,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-8">
             {featuredProducts.map((product: Product, index: number) => (
               <ProductCard key={product.id} product={product} priority={index < 2} />
             ))}
@@ -240,7 +241,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-8">
             {newArrivals.map((product: Product) => (
               <ProductCard key={product.id} product={product} />
             ))}

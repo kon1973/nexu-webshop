@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useActionState } from 'react'
 import { toast } from 'sonner'
 import { ArrowLeft, Save, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import type { Coupon } from '@prisma/client'
+import { updateCoupon } from '../../actions'
 
 type Category = {
   id: string
@@ -17,67 +17,32 @@ type Product = {
   name: string
 }
 
-export default function EditCouponForm({ coupon }: { coupon: Coupon & { products?: { id: number }[] } }) {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [products, setProducts] = useState<Product[]>([])
+const initialState = {
+  message: '',
+  errors: {}
+}
+
+export default function EditCouponForm({ 
+  coupon, 
+  categories, 
+  products 
+}: { 
+  coupon: Coupon & { products?: { id: number }[] },
+  categories: Category[],
+  products: Product[]
+}) {
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>(
     coupon.products?.map((p: { id: number }) => String(p.id)) || []
   )
 
+  const updateCouponWithId = updateCoupon.bind(null, coupon.id)
+  const [state, formAction, isPending] = useActionState(updateCouponWithId, initialState)
+
   useEffect(() => {
-    fetch('/api/categories')
-      .then((res) => res.json())
-      .then((data) => setCategories(data))
-      .catch(() => toast.error('Nem sikerült betölteni a kategóriákat'))
-
-    fetch('/api/products?limit=1000')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.products) setProducts(data.products)
-      })
-      .catch(() => toast.error('Nem sikerült betölteni a termékeket'))
-  }, [])
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-
-    const formData = new FormData(e.currentTarget)
-    const data = {
-      code: formData.get('code'),
-      discountType: formData.get('discountType'),
-      discountValue: Number(formData.get('discountValue')),
-      usageLimit: formData.get('usageLimit') ? Number(formData.get('usageLimit')) : null,
-      expiresAt: formData.get('expiresAt') || null,
-      isActive: formData.get('isActive') === 'on',
-      minOrderValue: formData.get('minOrderValue') ? Number(formData.get('minOrderValue')) : null,
-      categoryId: formData.get('categoryId') || null,
-      productIds: selectedProductIds
+    if (state.message) {
+      toast.error(state.message)
     }
-
-    try {
-      const res = await fetch(`/api/coupons/${coupon.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-
-      if (res.ok) {
-        toast.success('Kupon frissítve!')
-        router.push('/admin/coupons')
-        router.refresh()
-      } else {
-        const error = await res.json()
-        toast.error(error.error || 'Hiba történt')
-      }
-    } catch (error) {
-      toast.error('Hiba történt')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [state])
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white p-8 font-sans pt-24">
@@ -88,7 +53,7 @@ export default function EditCouponForm({ coupon }: { coupon: Coupon & { products
 
         <h1 className="text-3xl font-bold mb-8">Kupon szerkesztése</h1>
 
-        <form onSubmit={handleSubmit} className="space-y-6 bg-[#121212] p-8 rounded-2xl border border-white/5">
+        <form action={formAction} className="space-y-6 bg-[#121212] p-8 rounded-2xl border border-white/5">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Kupon kód</label>
             <input
@@ -99,6 +64,7 @@ export default function EditCouponForm({ coupon }: { coupon: Coupon & { products
               placeholder="PL. TELI2025"
               className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 uppercase"
             />
+            {state.errors?.code && <p className="text-red-500 text-sm mt-1">{state.errors.code[0]}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-6">
@@ -123,6 +89,7 @@ export default function EditCouponForm({ coupon }: { coupon: Coupon & { products
                 defaultValue={coupon.discountValue}
                 className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500"
               />
+              {state.errors?.discountValue && <p className="text-red-500 text-sm mt-1">{state.errors.discountValue[0]}</p>}
             </div>
           </div>
 
@@ -159,6 +126,7 @@ export default function EditCouponForm({ coupon }: { coupon: Coupon & { products
             <label className="block text-sm font-medium text-gray-400 mb-2">Termék korlátozás (opcionális)</label>
             <select
               multiple
+              name="productIds"
               className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 h-32"
               value={selectedProductIds}
               onChange={(e) => {
@@ -212,10 +180,10 @@ export default function EditCouponForm({ coupon }: { coupon: Coupon & { products
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isPending}
             className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {loading ? <Loader2 className="animate-spin" /> : <Save size={20} />}
+            {isPending ? <Loader2 className="animate-spin" /> : <Save size={20} />}
             Mentés
           </button>
         </form>

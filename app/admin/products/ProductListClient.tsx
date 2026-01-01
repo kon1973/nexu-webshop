@@ -1,12 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { Edit, Plus, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Edit, Plus, Search, Filter, ChevronLeft, ChevronRight, Package } from 'lucide-react'
 import DeleteButton from './DeleteButton'
 import VisibilityToggle from './VisibilityToggle'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import type { Product, Category } from '@prisma/client'
+import { getImageUrl } from '@/lib/image'
 
 type Props = {
   products: Product[]
@@ -131,10 +132,12 @@ export default function ProductListClient({ products, categories, totalCount, cu
                 <tr key={product.id} className="hover:bg-white/5 transition-colors">
                   <td className="p-4">
                     <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center text-2xl overflow-hidden">
-                      {product.image.startsWith('http') || product.image.startsWith('/') ? (
-                        <img src={product.image} alt="" className="w-full h-full object-cover" />
-                      ) : (
+                      {getImageUrl(product.image) ? (
+                        <img src={getImageUrl(product.image)!} alt="" className="w-full h-full object-cover" />
+                      ) : product.image === '\u{1f4e6}' ? (
                         product.image
+                      ) : (
+                        <Package size={24} className="text-gray-500" />
                       )}
                     </div>
                   </td>

@@ -8,7 +8,8 @@ import {
   AlertCircle, 
   DollarSign,
   Users,
-  Map,
+  Search,
+  History,
   ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
@@ -21,6 +22,15 @@ type AnalyticsData = {
   revenueGrowth: number
   currentOrders: number
   topProducts: { name: string; quantity: number; revenue: number }[]
+  topSearches: { query: string; count: number }[]
+  zeroResultSearches: { query: string; count: number }[]
+  recentInventoryLogs: { 
+    id: string
+    productName: string
+    change: number
+    reason: string
+    createdAt: Date 
+  }[]
 }
 
 export default function AnalyticsClient({ data }: { data: AnalyticsData }) {
@@ -119,37 +129,130 @@ export default function AnalyticsClient({ data }: { data: AnalyticsData }) {
         </div>
 
         {/* Top Products Table */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <div className="bg-[#121212] border border-white/5 rounded-2xl overflow-hidden">
+            <div className="p-6 border-b border-white/5">
+              <h2 className="text-xl font-bold">Legnépszerűbb Termékek</h2>
+            </div>
+            <table className="w-full text-left">
+              <thead className="bg-white/5 text-gray-400 text-sm uppercase">
+                <tr>
+                  <th className="p-4">Termék Neve</th>
+                  <th className="p-4 text-right">Eladott</th>
+                  <th className="p-4 text-right">Bevétel</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {data.topProducts.map((product, index) => (
+                  <tr key={index} className="hover:bg-white/5 transition-colors">
+                    <td className="p-4 font-medium text-white">{product.name}</td>
+                    <td className="p-4 text-right text-gray-400">{product.quantity} db</td>
+                    <td className="p-4 text-right font-bold text-green-400">
+                      {product.revenue.toLocaleString('hu-HU')} Ft
+                    </td>
+                  </tr>
+                ))}
+                {data.topProducts.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="p-8 text-center text-gray-500">
+                      Még nincs elegendő adat.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Search Analytics */}
+          <div className="bg-[#121212] border border-white/5 rounded-2xl overflow-hidden">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Search size={20} className="text-blue-400" />
+                Keresési Statisztikák
+              </h2>
+            </div>
+            <div className="p-6 space-y-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-400 mb-3 uppercase">Leggyakoribb Keresések</h3>
+                <div className="flex flex-wrap gap-2">
+                  {data.topSearches.map((search, i) => (
+                    <span key={i} className="bg-white/5 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                      {search.query}
+                      <span className="bg-white/10 px-1.5 rounded text-xs text-gray-400">{search.count}</span>
+                    </span>
+                  ))}
+                  {data.topSearches.length === 0 && <span className="text-gray-500 text-sm">Nincs adat</span>}
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium text-red-400 mb-3 uppercase flex items-center gap-2">
+                  <AlertCircle size={14} />
+                  Sikertelen Keresések (0 találat)
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {data.zeroResultSearches.map((search, i) => (
+                    <span key={i} className="bg-red-500/10 text-red-200 px-3 py-1 rounded-full text-sm flex items-center gap-2 border border-red-500/20">
+                      {search.query}
+                      <span className="bg-red-500/20 px-1.5 rounded text-xs">{search.count}</span>
+                    </span>
+                  ))}
+                  {data.zeroResultSearches.length === 0 && <span className="text-gray-500 text-sm">Nincs adat</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Inventory Logs */}
         <div className="bg-[#121212] border border-white/5 rounded-2xl overflow-hidden">
           <div className="p-6 border-b border-white/5">
-            <h2 className="text-xl font-bold">Legnépszerűbb Termékek (Bevétel alapján)</h2>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <History size={20} className="text-orange-400" />
+              Legutóbbi Készletmozgások
+            </h2>
           </div>
           <table className="w-full text-left">
             <thead className="bg-white/5 text-gray-400 text-sm uppercase">
               <tr>
-                <th className="p-4">Termék Neve</th>
-                <th className="p-4 text-right">Eladott Mennyiség</th>
-                <th className="p-4 text-right">Összbevétel</th>
+                <th className="p-4">Időpont</th>
+                <th className="p-4">Termék</th>
+                <th className="p-4">Típus</th>
+                <th className="p-4 text-right">Változás</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {data.topProducts.map((product, index) => (
-                <tr key={index} className="hover:bg-white/5 transition-colors">
-                  <td className="p-4 font-medium text-white">{product.name}</td>
-                  <td className="p-4 text-right text-gray-400">{product.quantity} db</td>
-                  <td className="p-4 text-right font-bold text-green-400">
-                    {product.revenue.toLocaleString('hu-HU')} Ft
+              {data.recentInventoryLogs.map((log) => (
+                <tr key={log.id} className="hover:bg-white/5 transition-colors">
+                  <td className="p-4 text-gray-400 text-sm">
+                    {new Date(log.createdAt).toLocaleString('hu-HU')}
+                  </td>
+                  <td className="p-4 font-medium text-white">{log.productName}</td>
+                  <td className="p-4">
+                    <span className={`text-xs px-2 py-1 rounded border ${
+                      log.reason === 'ORDER_PLACED' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
+                      log.reason === 'RESTOCK' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+                      log.reason === 'ORDER_CANCELLED' ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400' :
+                      'bg-gray-500/10 border-gray-500/20 text-gray-400'
+                    }`}>
+                      {log.reason}
+                    </span>
+                  </td>
+                  <td className={`p-4 text-right font-bold ${log.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {log.change > 0 ? '+' : ''}{log.change}
                   </td>
                 </tr>
               ))}
-              {data.topProducts.length === 0 && (
+              {data.recentInventoryLogs.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="p-8 text-center text-gray-500">
-                    Még nincs elegendő adat.
+                  <td colSpan={4} className="p-8 text-center text-gray-500">
+                    Nincs rögzített készletmozgás.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+
         </div>
       </div>
     </div>

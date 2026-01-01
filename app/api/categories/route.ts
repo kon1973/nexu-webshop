@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getCategoriesService, createCategoryService, CategorySchema } from '@/lib/services/categoryService'
+import { revalidatePath } from 'next/cache'
+import { CACHE_TAGS } from '@/lib/cache'
 
 export async function GET() {
   try {
@@ -26,6 +28,8 @@ export async function POST(req: Request) {
     }
 
     const category = await createCategoryService(result.data)
+
+    revalidatePath('/shop')
 
     return NextResponse.json(category)
   } catch (error) {

@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Save, Loader2, Search, Filter, ChevronRight, ChevronDown, Calculator } from 'lucide-react'
+import { Save, Loader2, Search, Filter, ChevronRight, ChevronDown, Calculator, Package } from 'lucide-react'
+import { bulkUpdateProductsAction } from '../actions'
+import { getImageUrl } from '@/lib/image'
 
 type Variant = {
   id: string
@@ -135,7 +137,8 @@ export default function BulkEditTable({ initialProducts, categories }: { initial
           id: p.id,
           price: Number(p.price),
           salePrice: p.salePrice !== null ? Number(p.salePrice) : null,
-          stock: Number(p.stock)
+          stock: Number(p.stock),
+          isArchived: p.isArchived
         }))
 
       const variantUpdates: any[] = []
@@ -159,20 +162,16 @@ export default function BulkEditTable({ initialProducts, categories }: { initial
         return
       }
 
-      const res = await fetch('/api/admin/products/bulk-update', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productUpdates, variantUpdates }),
-      })
+      const res = await bulkUpdateProductsAction(productUpdates, variantUpdates)
 
-      if (!res.ok) throw new Error('Hiba a mentés során')
+      if (!res.success) throw new Error(res.error || 'Hiba a mentés során')
 
       toast.success(`${productUpdates.length + variantUpdates.length} elem frissítve!`)
       setEditedProducts(new Set())
       setEditedVariants(new Set())
       router.refresh()
-    } catch (error) {
-      toast.error('Nem sikerült menteni a változásokat')
+    } catch (error: any) {
+      toast.error(error.message || 'Nem sikerült menteni a változásokat')
       console.error(error)
     } finally {
       setIsSaving(false)
@@ -260,10 +259,10 @@ export default function BulkEditTable({ initialProducts, categories }: { initial
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-xl overflow-hidden">
-                            {product.image && product.image.startsWith('http') ? (
-                                <img src={product.image} alt="" className="w-full h-full object-cover" />
+                            {getImageUrl(product.image) ? (
+                                <img src={getImageUrl(product.image)!} alt="" className="w-full h-full object-cover" />
                             ) : (
-                                product.image || '📦'
+                                <Package size={20} className="text-gray-500" />
                             )}
                           </div>
                           <div>

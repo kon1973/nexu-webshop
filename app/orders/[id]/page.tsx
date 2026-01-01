@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, PackageSearch, Truck, MapPin, CreditCard, Receipt } from 'lucide-react'
+import { ArrowLeft, PackageSearch, Truck, MapPin, CreditCard, Receipt, Package } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import CancelOrderButton from './CancelOrderButton'
 import OrderTimeline from './OrderTimeline'
 import ReorderButton from '@/components/ReorderButton'
 import { getOrderByIdService } from '@/lib/services/orderService'
 import { OrderItem } from '@prisma/client'
+import { getImageUrl } from '@/lib/image'
 
 function statusBadge(status: string) {
   const map: Record<string, { label: string; className: string }> = {
@@ -148,10 +149,10 @@ export default async function OrderTrackingPage(props: { params: Promise<{ id: s
               >
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-[#0a0a0a] rounded-xl border border-white/10 flex items-center justify-center text-2xl overflow-hidden shrink-0">
-                    {item.product?.image && (item.product.image.startsWith('http') || item.product.image.startsWith('/')) ? (
-                      <img src={item.product.image} alt={item.name || ''} className="w-full h-full object-cover" />
+                    {getImageUrl(item.product?.image) ? (
+                      <img src={getImageUrl(item.product?.image)!} alt={item.name || ''} className="w-full h-full object-cover" />
                     ) : (
-                      item.product?.image || '\u{1f4e6}'
+                      <Package size={24} className="text-gray-500" />
                     )}
                   </div>
                   <div>

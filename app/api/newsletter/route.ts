@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { subscribeToNewsletterService, NewsletterSchema } from '@/lib/services/newsletterService'
 import { z } from 'zod'
+import { enforceRateLimit, rateLimitExceededResponse } from '@/lib/enforceRateLimit' 
 
 export async function POST(req: Request) {
   try {
+    const ip = (await headers()).get('x-forwarded-for') ?? '127.0.0.1'
+    const rl = await enforceRateLimit(ip, 10, 3600, 'newsletter.subscribe') // 10 per hour
+    if (!rl.success) return rateLimitExceededResponse(undefined, rl.reset)
+
     const body = await req.json()
     
     // Validate first to catch format errors before service call if needed, 

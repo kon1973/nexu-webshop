@@ -1,6 +1,7 @@
 'use server'
 
 import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { createOrderService, CreateOrderSchema, CreateOrderInput } from '@/lib/services/orderService'
 import { sendOrderEmails } from '@/lib/email'
 import { logger } from '@/lib/logger'
@@ -35,6 +36,22 @@ export async function createOrder(data: CreateOrderInput) {
           const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
             apiVersion: '2025-12-15.clover' as any,
           })
+
+          // Verify amount
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
+          const expectedAmount = Math.round(totalPrice * 100)
+
+          if (paymentIntent.amount !== expectedAmount) {
+            logger.error(`Payment amount mismatch: expected ${expectedAmount}, got ${paymentIntent.amount}`)
+            
+            await prisma.order.update({
+              where: { id: order.id },
+              data: { status: 'cancelled' }
+            })
+            
+            return { success: false, error: 'Fizetési hiba: Az összeg nem egyezik.' }
+          }
+
           await stripe.paymentIntents.update(paymentIntentId, {
             metadata: { orderId: order.id }
           })
@@ -46,6 +63,7 @@ export async function createOrder(data: CreateOrderInput) {
           customerName,
           customerEmail,
           customerAddress,
+          paymentMethod: 'cod',
           items: order.items.map((item: any) => {
             const product = productById.get(item.productId!) as any
             let name = product.name
@@ -70,7 +88,7 @@ export async function createOrder(data: CreateOrderInput) {
             return {
               name: name,
               quantity: item.quantity,
-              unitPrice: item.price,
+              unitPrice: item.price, // Price from DB (already effective price)
               image: image
             }
           }),

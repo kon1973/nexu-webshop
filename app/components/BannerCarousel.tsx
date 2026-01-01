@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import type { Banner } from '@prisma/client'
+import { getImageUrl } from '@/lib/image'
 
 export default function BannerCarousel({ banners }: { banners: Banner[] }) {
   const [currentBanner, setCurrentBanner] = useState(0)
@@ -27,9 +28,9 @@ export default function BannerCarousel({ banners }: { banners: Banner[] }) {
         const Content = ({ isInsideLink }: { isInsideLink: boolean }) => (
           <>
             <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-black/20 to-transparent z-10" />
-            {banner.image.startsWith('http') || banner.image.startsWith('/') ? (
+            {getImageUrl(banner.image) ? (
               <Image
-                src={banner.image}
+                src={getImageUrl(banner.image)!}
                 alt={banner.title}
                 fill
                 className="object-cover"
@@ -37,11 +38,9 @@ export default function BannerCarousel({ banners }: { banners: Banner[] }) {
                 sizes="(max-width: 768px) 100vw, 1200px"
               />
             ) : (
-              <img
-                src={banner.image}
-                alt={banner.title}
-                className="w-full h-full object-cover"
-              />
+              <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                <span className="text-4xl">🖼️</span>
+              </div>
             )}
             <div className="absolute bottom-0 left-0 w-full p-6 md:p-16 z-20 flex flex-col items-start justify-end h-full">
               <h2 className="text-2xl md:text-6xl font-extrabold mb-2 md:mb-4 drop-shadow-xl text-white leading-tight max-w-3xl">

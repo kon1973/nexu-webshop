@@ -98,7 +98,12 @@ This document outlines the necessary steps to prepare the Nexu Webshop for produ
 - **Goal:** Improve search relevance and speed.
 - **Plan:** Integrate Algolia, Meilisearch, or Postgres Full Text Search with fuzzy matching.
 
-### 7.3. Progressive Web App (PWA)
+### 7.3. Product Recommendations
+- **Status:** ✅ COMPLETED
+- **Goal:** Increase average order value.
+- **Implementation:** Collaborative filtering (item-to-item) implemented in `lib/services/recommendationService.ts`.
+
+### 7.4. Progressive Web App (PWA)
 - **Status:** ⏳ PENDING
 - **Goal:** Installable app experience on mobile.
 - **Plan:** Add `manifest.json` and Service Workers using `next-pwa`.

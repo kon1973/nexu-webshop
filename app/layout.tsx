@@ -8,7 +8,7 @@ import CartSidebar from './components/CartSidebar'
 import Footer from './components/Footer'
 import ScrollToTop from './components/ScrollToTop'
 import { getSiteUrl } from '@/lib/site'
-import { getSettings } from '@/lib/cache'
+import { getSettings, getCategories } from '@/lib/cache'
 
 const inter = Inter({ subsets: ['latin'] })
 const siteUrl = getSiteUrl()
@@ -44,12 +44,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const settings = await getSettings()
+  const categories = await getCategories()
 
   return (
     <html lang="hu" suppressHydrationWarning>
       <body className={`${inter.className} bg-[#0a0a0a] text-white`}>
         <Providers settings={settings}>
-          <Navbar />
+          <Navbar categories={categories} />
           <CartSidebar />
           <main>{children}</main>
           <Footer settings={settings} />

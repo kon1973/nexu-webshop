@@ -1,9 +1,13 @@
 'use client'
 
-import { X, ShoppingCart, Star } from 'lucide-react'
+import { X, ShoppingCart, Star, Package } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import type { Product } from '@prisma/client'
+import { getImageUrl } from '@/lib/image'
+import QuickViewImage from './QuickViewImage'
+import React from 'react'
+import { createPortal } from 'react-dom'
 
 interface QuickViewModalProps {
   product: Product & { variants?: { id: string }[] }
@@ -22,12 +26,30 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
   
   const currentPrice = isOnSale ? product.salePrice! : product.price
 
+  // Render via portal so the modal is not affected by parent transforms/overflow
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Prevent body scroll when modal is open
+  React.useEffect(() => {
+    if (!mounted) return
+    if (isOpen) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = prev }
+    }
+  }, [isOpen, mounted])
+
+  if (!mounted) return null
   if (!isOpen) return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="bg-[#121212] border border-white/10 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative animate-in zoom-in-95 duration-200"
+        className="bg-[#121212] border border-white/10 rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden relative animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <button 
@@ -37,21 +59,25 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
           <X size={20} />
         </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
-          <div className="bg-[#0a0a0a] rounded-2xl p-8 flex items-center justify-center relative group">
-            <div className="text-9xl drop-shadow-2xl transition-transform duration-500 group-hover:scale-110">
-              {product.image}
+        <div className="grid grid-cols-1 md:grid-cols-[420px_1fr] gap-6 p-6">
+          <div className="bg-[#0a0a0a] rounded-2xl flex-none flex items-center justify-center relative group overflow-hidden aspect-square min-h-[300px]">
+            <div className="w-full h-full flex items-center justify-center">
+              {getImageUrl(product.image) ? (
+                <QuickViewImage src={getImageUrl(product.image)} alt={product.name} />
+              ) : (
+                <Package size={128} className="text-gray-500 mx-auto" />
+              )}
             </div>
           </div>
 
-          <div className="flex flex-col justify-center">
+          <div className="flex flex-col justify-between overflow-y-auto max-h-[calc(95vh-3.5rem)] pr-4 gap-4">
             <div className="mb-4">
               <span className="bg-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-purple-500/30">
                 {product.category}
               </span>
             </div>
 
-            <h2 className="text-3xl font-bold mb-2">{product.name}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-2">{product.name}</h2>
             
             <div className="flex items-center gap-2 mb-4">
               <div className="flex text-yellow-400">
@@ -71,7 +97,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
               {product.description}
             </p>
 
-            <div className="text-3xl font-bold text-purple-400 mb-8 flex items-center gap-3">
+            <div className="text-2xl md:text-3xl font-bold text-purple-400 mb-6 flex items-center gap-3">
               {isOnSale ? (
                 <>
                   <span className="text-gray-500 line-through text-xl">{product.price.toLocaleString('hu-HU')} Ft</span>
@@ -125,6 +151,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
       
       {/* Close on backdrop click */}
       <div className="absolute inset-0 -z-10" onClick={onClose} />
-    </div>
+    </div>,
+    document.body
   )
 }
