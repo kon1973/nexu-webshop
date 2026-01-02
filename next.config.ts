@@ -4,7 +4,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   experimental: {
     cpus: 1,
-    optimizePackageImports: ['lucide-react', '@prisma/client', 'sonner'],
+    optimizePackageImports: ['lucide-react', 'sonner'],
   },
   // Enable compression
   compress: true,
