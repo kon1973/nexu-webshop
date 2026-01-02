@@ -12,7 +12,11 @@ import SkipToContent from './components/Accessibility'
 import { getSiteUrl } from '@/lib/site'
 import { getSettings, getCategories } from '@/lib/cache'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap', // Optimize font loading
+  preload: true,
+})
 const siteUrl = getSiteUrl()
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -50,6 +54,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="hu" suppressHydrationWarning>
+      <head>
+        {/* Preconnect to critical third-party origins */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* DNS prefetch for analytics and payment providers */}
+        <link rel="dns-prefetch" href="https://js.stripe.com" />
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        {/* Prefetch critical navigation routes */}
+        <link rel="prefetch" href="/shop" as="document" />
+      </head>
       <body className={`${inter.className} bg-[#0a0a0a] text-white`}>
         <Providers settings={settings}>
           <SkipToContent />

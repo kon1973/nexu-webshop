@@ -6,12 +6,18 @@ import { Star, Eye, ArrowLeftRight, Package, ShoppingCart, Plus } from 'lucide-r
 import { useCart } from '@/context/CartContext'
 import { useCompare } from '@/context/CompareContext'
 import FavoriteButton from './FavoriteButton'
-import QuickViewModal from './QuickViewModal'
+import dynamic from 'next/dynamic'
 import type { Product } from '@prisma/client'
 import { toast } from 'sonner'
-import { useState, useMemo, useCallback, memo } from 'react'
+import { useState, useMemo, useCallback, memo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { getImageUrl } from '@/lib/image'
+
+// Lazy load QuickViewModal - only needed when user clicks quick view
+const QuickViewModal = dynamic(() => import('./QuickViewModal'), {
+  loading: () => null,
+  ssr: false,
+})
 
 interface ProductCardProps {
   product: Product & { 
@@ -255,11 +261,14 @@ const ProductCard = memo(function ProductCard({ product, priority = false }: Pro
             </button>
           </div>
         </div>
-        <QuickViewModal 
-          product={product} 
-          isOpen={isQuickViewOpen} 
-          onClose={() => setIsQuickViewOpen(false)} 
-        />
+        {/* Only render QuickViewModal when needed to reduce bundle size */}
+        {isQuickViewOpen && (
+          <QuickViewModal 
+            product={product} 
+            isOpen={isQuickViewOpen} 
+            onClose={() => setIsQuickViewOpen(false)} 
+          />
+        )}
       </article>
     </>
   )

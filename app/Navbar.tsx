@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { Heart, ShoppingCart, User, LogOut, Search, ChevronDown, LayoutDashboard, Package, ArrowLeftRight, Menu, X, Home, Grid3X3 } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useFavorites } from '@/context/FavoritesContext'
@@ -11,7 +11,13 @@ import { useCompare } from '@/context/CompareContext'
 import { useSession, signOut } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getImageUrl } from '@/lib/image'
-import SearchModal from './components/SearchModal'
+import dynamic from 'next/dynamic'
+
+// Lazy load SearchModal - only needed when user opens search
+const SearchModal = dynamic(() => import('./components/SearchModal'), {
+  loading: () => null,
+  ssr: false,
+})
 
 function isActivePath(pathname: string, href: string) {
   if (href === '/') return pathname === '/'
