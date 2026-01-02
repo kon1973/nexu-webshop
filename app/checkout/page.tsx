@@ -2,16 +2,17 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState, useEffect, type FormEvent } from 'react'
-import { ArrowLeft, CheckCircle, CreditCard, Loader2, Truck, MapPin, Banknote, UserPlus, Package } from 'lucide-react'
+import { useMemo, useState, useEffect, useTransition, type FormEvent } from 'react'
+import { ArrowLeft, CheckCircle, CreditCard, Loader2, Truck, MapPin, Banknote, UserPlus, Package, Shield, Clock, Gift, AlertTriangle, Star } from 'lucide-react'
 import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useCart } from '@/context/CartContext'
 import { useSettings } from '@/context/SettingsContext'
 import { useSession } from 'next-auth/react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements } from '@stripe/react-stripe-js'
 import { validateCoupon } from '@/app/cart/actions'
-import { createOrder } from './actions'
+import { createOrder, getUserAddresses, getUserLoyalty, validateCart, getDeliveryEstimate } from './actions'
 import CheckoutForm from './CheckoutForm'
 import { getImageUrl } from '@/lib/image'
 
@@ -33,14 +34,16 @@ interface Address {
 export default function CheckoutPage() {
   const { cart, itemCount, clearCart, coupon, applyCoupon, removeCoupon } = useCart()
   const { getNumberSetting } = useSettings()
-  const { data: session } = useSession()
+  const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [couponCode, setCouponCode] = useState('')
   const [couponLoading, setCouponLoading] = useState(false)
   
   const [saveAddress, setSaveAddress] = useState(false)
   const [addresses, setAddresses] = useState<Address[]>([])
+  const [addressesLoading, setAddressesLoading] = useState(true)
   const [selectedAddressId, setSelectedAddressId] = useState<string>('')
   
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'stripe'>('cod')
@@ -48,6 +51,12 @@ export default function CheckoutPage() {
   
   const [loyaltyDiscountPercentage, setLoyaltyDiscountPercentage] = useState(0)
   const [loyaltyTier, setLoyaltyTier] = useState('')
+  const [loyaltyProgress, setLoyaltyProgress] = useState(0)
+  const [nextTier, setNextTier] = useState<string | null>(null)
+  
+  const [deliveryEstimate, setDeliveryEstimate] = useState<string>('')
+  const [cartErrors, setCartErrors] = useState<string[]>([])
+  const [cartValidated, setCartValidated] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -73,7 +82,18 @@ export default function CheckoutPage() {
   const freeShippingThreshold = getNumberSetting('free_shipping_threshold', 20000)
   const shippingFee = getNumberSetting('shipping_fee', 2990)
 
+  // Fetch delivery estimate
   useEffect(() => {
+    startTransition(async () => {
+      const estimate = await getDeliveryEstimate()
+      setDeliveryEstimate(estimate.date)
+    })
+  }, [])
+
+  // Fetch user data with Server Actions
+  useEffect(() => {
+    if (sessionStatus === 'loading') return
+    
     if (session?.user) {
       setFormData(prev => ({
         ...prev,
@@ -81,61 +101,69 @@ export default function CheckoutPage() {
         email: prev.email || session.user.email || ''
       }))
 
-      fetch('/api/user/addresses')
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setAddresses(data)
-            const defaultAddress = data.find((a: Address) => a.isDefault)
-            if (defaultAddress) {
-              selectAddress(defaultAddress)
-            }
-            const defaultBilling = data.find((a: Address) => a.isBillingDefault)
-            if (defaultBilling) {
-              setUseDifferentBillingAddress(true)
-              setSelectedBillingAddressId(defaultBilling.id)
-              setBillingFormData(prev => ({
-                ...prev,
-                zipCode: defaultBilling.zipCode,
-                city: defaultBilling.city,
-                street: defaultBilling.street,
-                country: defaultBilling.country,
-                taxNumber: defaultBilling.taxNumber || ''
-              }))
-            }
+      // Fetch addresses with Server Action
+      startTransition(async () => {
+        setAddressesLoading(true)
+        const result = await getUserAddresses()
+        if (result.success && result.addresses) {
+          setAddresses(result.addresses)
+          const defaultAddress = result.addresses.find((a: Address) => a.isDefault)
+          if (defaultAddress) {
+            selectAddress(defaultAddress)
           }
-        })
-        .catch(console.error)
+          const defaultBilling = result.addresses.find((a: Address) => a.isBillingDefault)
+          if (defaultBilling) {
+            setUseDifferentBillingAddress(true)
+            setSelectedBillingAddressId(defaultBilling.id)
+            setBillingFormData(prev => ({
+              ...prev,
+              zipCode: defaultBilling.zipCode,
+              city: defaultBilling.city,
+              street: defaultBilling.street,
+              country: defaultBilling.country,
+              taxNumber: defaultBilling.taxNumber || ''
+            }))
+          }
+        }
+        setAddressesLoading(false)
+      })
 
-      fetch('/api/user/loyalty')
-        .then(res => res.json())
-        .then(data => {
-          if (data.discountPercentage > 0) {
-             setLoyaltyTier(data.tierName)
-             setLoyaltyDiscountPercentage(data.discountPercentage)
-          }
-        })
-        .catch(console.error)
+      // Fetch loyalty info with Server Action
+      startTransition(async () => {
+        const loyalty = await getUserLoyalty()
+        if (loyalty.discountPercentage > 0) {
+          setLoyaltyTier(loyalty.tierName)
+          setLoyaltyDiscountPercentage(loyalty.discountPercentage)
+          setLoyaltyProgress(loyalty.progress || 0)
+          setNextTier(loyalty.nextTier || null)
+        }
+      })
+    } else {
+      setAddressesLoading(false)
     }
-  }, [session])
+  }, [session, sessionStatus])
 
+  // Validate cart with Server Action
   useEffect(() => {
     if (cart.length > 0) {
-      fetch('/api/cart/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: cart }),
+      startTransition(async () => {
+        const result = await validateCart(cart.map(item => ({
+          id: typeof item.id === 'string' ? parseInt(item.id, 10) : item.id,
+          quantity: item.quantity,
+          variantId: item.variantId || undefined,
+          selectedOptions: item.selectedOptions
+        })))
+        
+        if (!result.valid && result.errors) {
+          setCartErrors(result.errors)
+          result.errors.forEach((err: string) => toast.error(err))
+        } else {
+          setCartErrors([])
+        }
+        setCartValidated(true)
       })
-        .then(res => res.json())
-        .then(data => {
-          if (!data.valid && data.errors) {
-            toast.error('Probléma van a kosár tartalmával!')
-            data.errors.forEach((err: string) => toast.error(err))
-            // Optional: redirect to cart or disable checkout
-            // router.push('/cart')
-          }
-        })
-        .catch(console.error)
+    } else {
+      setCartValidated(true)
     }
   }, [cart])
 
@@ -232,14 +260,23 @@ export default function CheckoutPage() {
   if (cart.length === 0) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-4 font-sans">
-        <h1 className="text-3xl font-bold mb-4">A kosarad üres</h1>
-        <p className="text-gray-400 mb-8">Nincs mit kifizetni.</p>
-        <Link
-          href="/shop"
-          className="bg-purple-600 px-8 py-3 rounded-xl font-bold text-white hover:bg-purple-500 transition-colors"
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
         >
-          Vissza a boltba
-        </Link>
+          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
+            <Package className="w-12 h-12 text-purple-400" />
+          </div>
+          <h1 className="text-3xl font-bold mb-4">A kosarad üres</h1>
+          <p className="text-gray-400 mb-8">Nincs mit kifizetni.</p>
+          <Link
+            href="/shop"
+            className="inline-flex items-center gap-2 bg-purple-600 px-8 py-3 rounded-xl font-bold text-white hover:bg-purple-500 transition-colors"
+          >
+            Vissza a boltba
+          </Link>
+        </motion.div>
       </div>
     )
   }
@@ -314,8 +351,52 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white pt-24 pb-12 font-sans selection:bg-purple-500/30">
+    <div className="min-h-screen bg-[#0a0a0a] text-white pt-24 pb-12 font-sans selection:bg-purple-500/30 relative">
+      {/* Loading overlay */}
+      <AnimatePresence>
+        {isPending && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center"
+          >
+            <div className="bg-[#121212] rounded-2xl p-8 shadow-xl flex flex-col items-center gap-4">
+              <Loader2 className="animate-spin text-purple-500" size={48} />
+              <p className="text-gray-400">Betöltés...</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="container mx-auto px-4 max-w-5xl">
+        {/* Cart validation errors */}
+        <AnimatePresence>
+          {cartErrors.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mb-6 bg-red-900/30 border border-red-500/30 rounded-2xl p-6"
+            >
+              <div className="flex items-start gap-4">
+                <AlertTriangle className="text-red-400 flex-shrink-0 mt-1" size={24} />
+                <div>
+                  <h3 className="text-lg font-bold text-red-100 mb-2">Figyelem!</h3>
+                  <ul className="space-y-1">
+                    {cartErrors.map((err, i) => (
+                      <li key={i} className="text-red-200 text-sm">• {err}</li>
+                    ))}
+                  </ul>
+                  <Link href="/cart" className="inline-block mt-3 text-red-400 hover:text-red-300 text-sm font-bold">
+                    → Vissza a kosárhoz
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex items-center justify-center mb-12">
           <div className="flex items-center gap-4 text-sm sm:text-base">
             <div className="flex items-center gap-2 text-green-500 font-bold">
@@ -389,9 +470,12 @@ export default function CheckoutPage() {
                 <div className="mb-6">
                   <label className="block text-sm font-bold text-gray-400 mb-3">Mentett címek</label>
                   <div className="grid grid-cols-1 gap-3">
-                    {addresses.map((addr) => (
-                      <button
+                    {addresses.map((addr, index) => (
+                      <motion.button
                         key={addr.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
                         type="button"
                         onClick={() => selectAddress(addr)}
                         className={`text-left p-4 rounded-xl border transition-all flex items-start gap-3 ${
@@ -410,9 +494,16 @@ export default function CheckoutPage() {
                         {selectedAddressId === addr.id && (
                           <CheckCircle className="ml-auto text-purple-500" size={18} />
                         )}
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {addressesLoading && session?.user && (
+                <div className="mb-6 flex items-center gap-3 text-gray-400">
+                  <Loader2 className="animate-spin" size={16} />
+                  <span className="text-sm">Mentett címek betöltése...</span>
                 </div>
               )}
 
@@ -731,8 +822,23 @@ export default function CheckoutPage() {
           </div>
 
           <div>
-            <div className="bg-[#121212] border border-white/5 rounded-2xl p-8 sticky top-24 shadow-2xl">
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-[#121212] border border-white/5 rounded-2xl p-8 sticky top-24 shadow-2xl"
+            >
               <h2 className="text-xl font-bold mb-6">Rendelés összesítése</h2>
+
+              {/* Delivery estimate */}
+              {deliveryEstimate && (
+                <div className="bg-green-900/20 border border-green-500/20 rounded-xl p-4 mb-6 flex items-center gap-3">
+                  <Clock className="text-green-400" size={20} />
+                  <div>
+                    <p className="text-sm font-bold text-green-400">Várható kézbesítés</p>
+                    <p className="text-xs text-green-300/70">{deliveryEstimate}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
                 <div className="flex justify-between text-xs text-gray-400 mb-2">
@@ -864,8 +970,8 @@ export default function CheckoutPage() {
               <button
                 type="submit"
                 form="checkout-form"
-                disabled={isSubmitting}
-                className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl text-lg shadow-lg shadow-purple-900/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSubmitting || cartErrors.length > 0}
+                className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl text-lg shadow-lg shadow-purple-900/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle size={22} />}
                 {isSubmitting ? 'Feldolgozás...' : 'Megrendelés leadása'}
@@ -875,7 +981,29 @@ export default function CheckoutPage() {
               <p className="text-xs text-gray-500 text-center mt-4">
                 A gombra kattintva elfogadod az Általános Szerződési Feltételeket.
               </p>
-            </div>
+
+              {/* Trust badges */}
+              <div className="mt-6 pt-6 border-t border-white/10">
+                <div className="grid grid-cols-2 gap-4 text-xs text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <Shield className="text-green-400" size={16} />
+                    <span>Biztonságos fizetés</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Truck className="text-blue-400" size={16} />
+                    <span>Gyors kiszállítás</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Gift className="text-purple-400" size={16} />
+                    <span>Ajándék csomagolás</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Star className="text-yellow-400" size={16} />
+                    <span>100% elégedettség</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>
