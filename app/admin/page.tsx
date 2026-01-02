@@ -1,375 +1,473 @@
 import { prisma } from '@/lib/prisma'
-import Link from 'next/link'
-import OrderStatus from './OrderStatus'
-import SalesChart from './SalesChart'
-import OrderStatusChart from './OrderStatusChart'
-import ExportOrdersButton from './ExportOrdersButton'
-import { Calendar, Mail, MapPin, Plus, Star, ArrowRight } from 'lucide-react'
-import type { Product, Review, Order, User as PrismaUser, OrderItem } from '@prisma/client'
+import AdminDashboardClient from './AdminDashboardClient'
 
-function formatDate(date: Date) {
-  return new Date(date).toLocaleDateString('hu-HU', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+// Helper function to get date ranges
+function getDateRange(days: number) {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(start.getDate() - days)
+  return { start, end }
+}
+
+// Helper function to get previous period
+function getPreviousPeriod(days: number) {
+  const end = new Date()
+  end.setDate(end.getDate() - days)
+  const start = new Date()
+  start.setDate(start.getDate() - (days * 2))
+  return { start, end }
 }
 
 export default async function AdminPage() {
-  // 1. Total Revenue & Orders
-  const revenueAgg = await prisma.order.aggregate({
+  // Date ranges for different periods
+  const periods = {
+    week: getDateRange(7),
+    month: getDateRange(30),
+    quarter: getDateRange(90),
+    year: getDateRange(365)
+  }
+
+  const prevPeriods = {
+    week: getPreviousPeriod(7),
+    month: getPreviousPeriod(30),
+    quarter: getPreviousPeriod(90),
+    year: getPreviousPeriod(365)
+  }
+
+  // 1. Total Revenue & Orders (all time)
+  const totalRevenueAgg = await prisma.order.aggregate({
     where: { status: { not: 'cancelled' } },
     _sum: { totalPrice: true },
     _count: { id: true },
   })
-  const totalRevenue = revenueAgg._sum.totalPrice || 0
-  const totalOrders = revenueAgg._count.id
+  const totalRevenue = totalRevenueAgg._sum.totalPrice || 0
+  const totalOrders = totalRevenueAgg._count.id
 
-  // 2. Pending Orders
+  // 2. Revenue by period
+  const [weekRevenue, monthRevenue, quarterRevenue, yearRevenue] = await Promise.all([
+    prisma.order.aggregate({
+      where: { status: { not: 'cancelled' }, createdAt: { gte: periods.week.start } },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    }),
+    prisma.order.aggregate({
+      where: { status: { not: 'cancelled' }, createdAt: { gte: periods.month.start } },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    }),
+    prisma.order.aggregate({
+      where: { status: { not: 'cancelled' }, createdAt: { gte: periods.quarter.start } },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    }),
+    prisma.order.aggregate({
+      where: { status: { not: 'cancelled' }, createdAt: { gte: periods.year.start } },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    })
+  ])
+
+  // 3. Previous period revenue for comparison
+  const [prevWeekRevenue, prevMonthRevenue, prevQuarterRevenue] = await Promise.all([
+    prisma.order.aggregate({
+      where: { 
+        status: { not: 'cancelled' }, 
+        createdAt: { gte: prevPeriods.week.start, lt: prevPeriods.week.end } 
+      },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    }),
+    prisma.order.aggregate({
+      where: { 
+        status: { not: 'cancelled' }, 
+        createdAt: { gte: prevPeriods.month.start, lt: prevPeriods.month.end } 
+      },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    }),
+    prisma.order.aggregate({
+      where: { 
+        status: { not: 'cancelled' }, 
+        createdAt: { gte: prevPeriods.quarter.start, lt: prevPeriods.quarter.end } 
+      },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    })
+  ])
+
+  // Calculate changes
+  const calcChange = (current: number, previous: number) => 
+    previous > 0 ? Math.round(((current - previous) / previous) * 100) : 0
+
+  const revenueByPeriod = {
+    week: {
+      revenue: weekRevenue._sum.totalPrice || 0,
+      orders: weekRevenue._count.id,
+      change: calcChange(weekRevenue._sum.totalPrice || 0, prevWeekRevenue._sum.totalPrice || 0),
+      ordersChange: calcChange(weekRevenue._count.id, prevWeekRevenue._count.id)
+    },
+    month: {
+      revenue: monthRevenue._sum.totalPrice || 0,
+      orders: monthRevenue._count.id,
+      change: calcChange(monthRevenue._sum.totalPrice || 0, prevMonthRevenue._sum.totalPrice || 0),
+      ordersChange: calcChange(monthRevenue._count.id, prevMonthRevenue._count.id)
+    },
+    quarter: {
+      revenue: quarterRevenue._sum.totalPrice || 0,
+      orders: quarterRevenue._count.id,
+      change: calcChange(quarterRevenue._sum.totalPrice || 0, prevQuarterRevenue._sum.totalPrice || 0),
+      ordersChange: calcChange(quarterRevenue._count.id, prevQuarterRevenue._count.id)
+    },
+    year: {
+      revenue: yearRevenue._sum.totalPrice || 0,
+      orders: yearRevenue._count.id,
+      change: 0,
+      ordersChange: 0
+    }
+  }
+
+  // 4. Pending Orders
   const pendingOrders = await prisma.order.count({
     where: { status: { in: ['pending', 'paid'] } },
   })
 
-  // 3. Recent Orders (Limit to 10)
+  // 5. Recent Orders (Limit to 10) - exclude cancelled
   const recentOrders = await prisma.order.findMany({
     take: 10,
+    where: { status: { not: 'cancelled' } },
     orderBy: { createdAt: 'desc' },
     include: {
       user: true,
-      items: {
-        include: { product: true },
-      },
+      items: { include: { product: true } },
     },
   })
 
-  // 4. Low Stock
+  // 6. Low Stock
   const lowStockProducts = await prisma.product.findMany({
     where: { stock: { lt: 5 } },
     orderBy: { stock: 'asc' },
-    take: 5,
+    take: 8,
   })
 
-  // 5. Recent Reviews
+  // 7. Recent Reviews
   const recentReviews = await prisma.review.findMany({
-    take: 3,
+    take: 5,
     orderBy: { createdAt: 'desc' },
     include: { product: true },
   })
 
-  // 6. Chart Data (Last 7 days)
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-  
-  const chartOrders = await prisma.order.findMany({
+  // 8. Daily chart data for last 30 days
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  const dailyOrders = await prisma.order.findMany({
     where: {
-      createdAt: { gte: sevenDaysAgo },
+      createdAt: { gte: thirtyDaysAgo },
       status: { in: ['pending', 'paid', 'shipped', 'completed'] }
     },
     select: { createdAt: true, totalPrice: true }
   })
 
-  const salesByDate = new Map<string, number>()
-  for (let i = 6; i >= 0; i--) {
+  // Generate daily data for 30 days
+  const dailySalesMap = new Map<string, { revenue: number; orders: number }>()
+  for (let i = 29; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
-    const dateStr = d.toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })
-    salesByDate.set(dateStr, 0)
+    const dateStr = d.toISOString().split('T')[0]
+    dailySalesMap.set(dateStr, { revenue: 0, orders: 0 })
   }
 
-  chartOrders.forEach((order: { createdAt: Date, totalPrice: number }) => {
-    const dateStr = new Date(order.createdAt).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })
-    if (salesByDate.has(dateStr)) {
-      salesByDate.set(dateStr, (salesByDate.get(dateStr) || 0) + order.totalPrice)
+  dailyOrders.forEach((order) => {
+    const dateStr = new Date(order.createdAt).toISOString().split('T')[0]
+    if (dailySalesMap.has(dateStr)) {
+      const current = dailySalesMap.get(dateStr)!
+      dailySalesMap.set(dateStr, { 
+        revenue: current.revenue + order.totalPrice, 
+        orders: current.orders + 1 
+      })
     }
   })
 
-  const chartData = Array.from(salesByDate.entries()).map(([date, amount]) => ({
+  const dailyChartData = Array.from(dailySalesMap.entries()).map(([date, data]) => ({
     date,
-    amount,
+    label: new Date(date).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' }),
+    revenue: data.revenue,
+    orders: data.orders
   }))
 
-  // 7. Top Products
+  // 9. Weekly chart data for last 12 weeks
+  const weeklyChartData: Array<{ week: string; revenue: number; orders: number }> = []
+  for (let i = 11; i >= 0; i--) {
+    const weekEnd = new Date()
+    weekEnd.setDate(weekEnd.getDate() - (i * 7))
+    const weekStart = new Date(weekEnd)
+    weekStart.setDate(weekStart.getDate() - 7)
+    
+    const weekOrders = dailyOrders.filter(order => {
+      const orderDate = new Date(order.createdAt)
+      return orderDate >= weekStart && orderDate < weekEnd
+    })
+    
+    weeklyChartData.push({
+      week: `${weekStart.toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })}`,
+      revenue: weekOrders.reduce((sum, o) => sum + o.totalPrice, 0),
+      orders: weekOrders.length
+    })
+  }
+
+  // 10. Monthly chart data for last 12 months
+  const yearAgo = new Date()
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1)
+
+  const monthlyOrders = await prisma.order.findMany({
+    where: {
+      createdAt: { gte: yearAgo },
+      status: { in: ['pending', 'paid', 'shipped', 'completed'] }
+    },
+    select: { createdAt: true, totalPrice: true }
+  })
+
+  const monthlyChartData: Array<{ month: string; revenue: number; orders: number }> = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    const monthStr = d.toLocaleDateString('hu-HU', { year: '2-digit', month: 'short' })
+    const monthOrders = monthlyOrders.filter(order => {
+      const orderDate = new Date(order.createdAt)
+      return orderDate.getMonth() === d.getMonth() && orderDate.getFullYear() === d.getFullYear()
+    })
+    monthlyChartData.push({
+      month: monthStr,
+      revenue: monthOrders.reduce((sum, o) => sum + o.totalPrice, 0),
+      orders: monthOrders.length
+    })
+  }
+
+  // 11. Top Products
   const topSellingItems = await prisma.orderItem.groupBy({
     by: ['productId'],
     where: { order: { status: { not: 'cancelled' } } },
     _sum: { quantity: true },
     orderBy: { _sum: { quantity: 'desc' } },
-    take: 5,
+    take: 10,
   })
 
-  // Fetch product names for the top selling items
-  // Note: productId in OrderItem might be null if product was deleted, but schema says Int (not optional?)
-  // Let's check schema. OrderItem: product Product @relation... productId Int. It is not optional.
-  // However, if we want to be safe, we filter nulls if any.
-  
   const productIds = topSellingItems
-    .map((item: { productId: number | null, _sum: { quantity: number | null } }) => item.productId)
-    .filter((id: number | null): id is number => id !== null)
+    .map((item) => item.productId)
+    .filter((id): id is number => id !== null)
 
   const productsInfo = await prisma.product.findMany({
     where: { id: { in: productIds } },
-    select: { id: true, name: true }
+    select: { id: true, name: true, price: true, category: true }
   })
 
-  const topProducts = topSellingItems.map((item: { productId: number | null, _sum: { quantity: number | null } }) => {
+  const topProducts = topSellingItems.map((item) => {
     const product = productsInfo.find((p) => p.id === item.productId)
-    return [product?.name || 'Ismeretlen', item._sum.quantity || 0] as [string, number]
-  })
-
-  // 8. User Stats
-  const totalUsers = await prisma.user.count()
-  const newUsers = await prisma.user.count({
-    where: {
-      createdAt: { gte: sevenDaysAgo }
+    return { 
+      name: product?.name || 'Ismeretlen', 
+      count: item._sum.quantity || 0,
+      revenue: (product?.price || 0) * (item._sum.quantity || 0),
+      category: product?.category || 'Egyéb'
     }
   })
 
-  // 9. Order Status Distribution
+  // 12. User Stats by period
+  const [totalUsers, weekUsers, monthUsers, quarterUsers] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({ where: { createdAt: { gte: periods.week.start } } }),
+    prisma.user.count({ where: { createdAt: { gte: periods.month.start } } }),
+    prisma.user.count({ where: { createdAt: { gte: periods.quarter.start } } })
+  ])
+
+  const [prevWeekUsers, prevMonthUsers] = await Promise.all([
+    prisma.user.count({ 
+      where: { createdAt: { gte: prevPeriods.week.start, lt: prevPeriods.week.end } } 
+    }),
+    prisma.user.count({ 
+      where: { createdAt: { gte: prevPeriods.month.start, lt: prevPeriods.month.end } } 
+    })
+  ])
+
+  const usersByPeriod = {
+    total: totalUsers,
+    week: { count: weekUsers, change: calcChange(weekUsers, prevWeekUsers) },
+    month: { count: monthUsers, change: calcChange(monthUsers, prevMonthUsers) },
+    quarter: { count: quarterUsers, change: 0 }
+  }
+
+  // 13. Order Status Distribution - exclude cancelled from chart
   const ordersByStatus = await prisma.order.groupBy({
     by: ['status'],
+    where: { status: { not: 'cancelled' } },
     _count: { id: true },
   })
 
-  const orderStatusData = ordersByStatus.map((item: { status: string, _count: { id: number } }) => ({
+  const orderStatusData = ordersByStatus.map((item) => ({
     status: item.status,
     count: item._count.id
   }))
 
-  // 10. Average Order Value
-  const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
+  // 14. Revenue by category
+  const orderItemsWithCategory = await prisma.orderItem.findMany({
+    where: { order: { status: { not: 'cancelled' } } },
+    include: { product: { select: { category: true } } }
+  })
+
+  const categoryRevenueMap = new Map<string, number>()
+  orderItemsWithCategory.forEach(item => {
+    const category = item.product?.category || 'Egyéb'
+    const current = categoryRevenueMap.get(category) || 0
+    categoryRevenueMap.set(category, current + (item.price * item.quantity))
+  })
+
+  const revenueByCategory = Array.from(categoryRevenueMap.entries())
+    .map(([category, revenue]) => ({ category, revenue }))
+    .sort((a, b) => b.revenue - a.revenue)
+
+  // 15. Average Order Value by period
+  const avgOrderByPeriod = {
+    week: revenueByPeriod.week.orders > 0 
+      ? Math.round(revenueByPeriod.week.revenue / revenueByPeriod.week.orders) : 0,
+    month: revenueByPeriod.month.orders > 0 
+      ? Math.round(revenueByPeriod.month.revenue / revenueByPeriod.month.orders) : 0,
+    quarter: revenueByPeriod.quarter.orders > 0 
+      ? Math.round(revenueByPeriod.quarter.revenue / revenueByPeriod.quarter.orders) : 0,
+    year: revenueByPeriod.year.orders > 0 
+      ? Math.round(revenueByPeriod.year.revenue / revenueByPeriod.year.orders) : 0,
+    total: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
+  }
+
+  // 16. Hourly distribution (orders by hour of day) - exclude cancelled
+  const allOrders = await prisma.order.findMany({
+    where: { 
+      createdAt: { gte: periods.month.start },
+      status: { not: 'cancelled' }
+    },
+    select: { createdAt: true }
+  })
+
+  const hourlyDistribution = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    orders: allOrders.filter(o => new Date(o.createdAt).getHours() === hour).length
+  }))
+
+  // 17. Day of week distribution
+  const dayOfWeekNames = ['Vas', 'Hét', 'Kedd', 'Szer', 'Csüt', 'Pén', 'Szom']
+  const dayOfWeekDistribution = dayOfWeekNames.map((name, index) => ({
+    day: name,
+    orders: allOrders.filter(o => new Date(o.createdAt).getDay() === index).length
+  }))
+
+  // 18. Conversion funnel (simplified)
+  const totalVisitors = totalUsers * 5 // Approximate visitors based on users
+  const cartAbandonment = Math.round(totalOrders * 0.3) // Approximate abandoned carts
+  const conversionRate = totalVisitors > 0 ? ((totalOrders / totalVisitors) * 100).toFixed(1) : '0'
+
+  // 19. Review stats
+  const reviewStats = await prisma.review.aggregate({
+    _avg: { rating: true },
+    _count: { id: true }
+  })
+
+  const reviewsByRating = await prisma.review.groupBy({
+    by: ['rating'],
+    _count: { id: true }
+  })
+
+  // 20. Activities for feed - only show non-cancelled orders
+  const activities = [
+    ...recentOrders.filter(o => o.status !== 'cancelled').slice(0, 5).map(order => ({
+      id: `order-${order.id}`,
+      type: 'order' as const,
+      title: `Új rendelés: ${order.customerName}`,
+      description: `${order.totalPrice.toLocaleString('hu-HU')} Ft értékben`,
+      timestamp: order.createdAt.toISOString(),
+      href: `/admin/orders/${order.id}`
+    })),
+    ...recentReviews.slice(0, 3).map(review => ({
+      id: `review-${review.id}`,
+      type: 'review' as const,
+      title: `Új értékelés: ${review.userName}`,
+      description: `${review.rating}★ - ${review.product.name}`,
+      timestamp: review.createdAt.toISOString(),
+      href: `/admin/reviews`
+    })),
+    ...lowStockProducts.slice(0, 3).map(product => ({
+      id: `stock-${product.id}`,
+      type: 'stock' as const,
+      title: `Alacsony készlet: ${product.name}`,
+      description: `Már csak ${product.stock} db maradt`,
+      timestamp: new Date().toISOString(),
+      href: `/admin/edit-product/${product.id}`
+    }))
+  ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white p-8 font-sans pt-24 selection:bg-purple-500/30">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-            Admin vezérlőpult
-          </h1>
-
-          <div className="flex gap-3 items-center flex-wrap justify-center">
-            <span className="bg-blue-500/10 text-blue-400 px-4 py-2 rounded-full text-sm font-medium border border-blue-500/20 inline-flex items-center gap-2">
-              <Calendar size={16} className="opacity-80" /> {new Date().toLocaleDateString('hu-HU')}
-            </span>
-
-            <ExportOrdersButton />
-
-            <Link
-              href="/admin/add-product"
-              className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2 rounded-full font-bold transition-all flex items-center gap-2 shadow-lg shadow-purple-500/20 hover:scale-105 active:scale-95 text-sm"
-            >
-              <Plus size={16} /> Új termék
-            </Link>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 hover:border-green-500/30 transition-all">
-            <h3 className="text-gray-400 text-sm uppercase tracking-wider mb-2">Összes bevétel</h3>
-            <p className="text-3xl font-bold text-green-400">{totalRevenue.toLocaleString('hu-HU')} Ft</p>
-          </div>
-
-          <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all">
-            <h3 className="text-gray-400 text-sm uppercase tracking-wider mb-2">Összes rendelés</h3>
-            <p className="text-3xl font-bold text-blue-400">{totalOrders} db</p>
-          </div>
-
-
-          <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 hover:border-yellow-500/30 transition-all">
-            <h3 className="text-gray-400 text-sm uppercase tracking-wider mb-2">Aktív rendelések</h3>
-            <p className="text-3xl font-bold text-yellow-400">{pendingOrders} db</p>
-          </div>
-
-          <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 hover:border-purple-500/30 transition-all">
-            <h3 className="text-gray-400 text-sm uppercase tracking-wider mb-2">Felhasználók</h3>
-            <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold text-purple-400">{totalUsers}</p>
-              <span className="text-sm text-green-400 font-medium">+{newUsers} új</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-          <div className="lg:col-span-2">
-            <h2 className="text-2xl font-bold mb-6 text-white">Bevétel alakulása (utolsó 7 nap)</h2>
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 h-[350px]">
-              <SalesChart data={chartData} />
-            </div>
-          </div>
-          <div className="lg:col-span-1">
-            <h2 className="text-2xl font-bold mb-6 text-white">Rendelések státusz szerint</h2>
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 h-[350px]">
-              <OrderStatusChart data={orderStatusData} />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-          <div className="lg:col-span-1">
-            <h2 className="text-2xl font-bold mb-6 text-white">Legnépszerűbb termékek</h2>
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 h-full">
-              <div className="space-y-6">
-                {topProducts.map(([name, count]: [string, number], index: number) => {
-                  const maxCount = topProducts[0]?.[1] || 1
-                  const percentage = (count / maxCount) * 100
-                  
-                  return (
-                    <div key={name} className="relative">
-                      <div className="flex justify-between items-end mb-2 text-sm">
-                        <span className="font-medium text-white truncate max-w-[70%]">{name}</span>
-                        <span className="font-bold text-purple-400">{count} db</span>
-                      </div>
-                      <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-                {topProducts.length === 0 && <p className="text-gray-500 italic text-center py-4">Még nincs eladott termék.</p>}
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-1">
-            <h2 className="text-2xl font-bold mb-6 text-white">Legutóbbi értékelések</h2>
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 h-full">
-              <div className="space-y-4">
-                {recentReviews.map((review: Review & { product: Product }) => (
-                  <div key={review.id} className="p-4 bg-white/5 rounded-xl border border-white/5">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1 text-yellow-500">
-                        <Star size={12} fill="currentColor" />
-                        <span className="text-sm font-bold">{review.rating}</span>
-                      </div>
-                      <span className="text-xs text-gray-500">{new Date(review.createdAt).toLocaleDateString('hu-HU')}</span>
-                    </div>
-                    <p className="text-sm text-gray-300 line-clamp-2 mb-2 italic">"{review.text}"</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span className="truncate max-w-[150px]">{review.product.name}</span>
-                      <span>•</span>
-                      <span>{review.userName}</span>
-                    </div>
-                  </div>
-                ))}
-                {recentReviews.length === 0 && <p className="text-gray-500 italic text-center py-4">Még nincsenek értékelések.</p>}
-                {recentReviews.length > 0 && (
-                  <Link href="/admin/reviews" className="block text-center text-sm text-purple-400 hover:text-purple-300 mt-4">
-                    Összes értékelés megtekintése
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-1">
-            <h2 className="text-2xl font-bold mb-6 text-red-400">Alacsony készlet</h2>
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 h-full">
-              <div className="space-y-4">
-                {lowStockProducts.map((product: Product) => (
-                  <div key={product.id} className="flex items-center justify-between p-4 bg-red-500/5 rounded-xl border border-red-500/10 hover:bg-red-500/10 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <span className="text-2xl">{product.image}</span>
-                      <div>
-                        <h3 className="font-bold text-white truncate max-w-[120px]">{product.name}</h3>
-                        <p className="text-red-400 text-sm font-bold">Csak {product.stock} db!</p>
-                      </div>
-                    </div>
-                    <Link 
-                      href={`/admin/edit-product/${product.id}`} 
-                      className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-colors"
-                    >
-                      Frissítés
-                    </Link>
-                  </div>
-                ))}
-                {lowStockProducts.length === 0 && <p className="text-gray-500 italic text-center py-4">Minden termékből van elég készlet.</p>}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <h2 className="text-2xl font-bold mb-6">Legutóbbi rendelések</h2>
-
-        <div className="space-y-4">
-          {recentOrders.map((order: Order & { user: PrismaUser | null, items: (OrderItem & { product: Product | null })[] }) => (
-            <div
-              key={order.id}
-              className="bg-[#121212] border border-white/5 rounded-xl p-6 hover:bg-[#151515] transition-colors"
-            >
-              <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 pb-6 border-b border-white/5 gap-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="font-mono text-sm text-gray-500">#{order.id.slice(-6).toUpperCase()}</span>
-                    <span className="text-lg font-bold">{order.customerName}</span>
-                  </div>
-                  <div className="text-sm text-gray-400 flex flex-col sm:flex-row gap-2 sm:gap-4">
-                    <span className="inline-flex items-center gap-2">
-                      <Mail size={14} className="opacity-70" /> {order.customerEmail}
-                    </span>
-                    <span className="inline-flex items-center gap-2">
-                      <Calendar size={14} className="opacity-70" /> {formatDate(order.createdAt)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className="text-sm text-gray-400">Végösszeg</p>
-                    <p className="text-xl font-bold text-white">{order.totalPrice.toLocaleString('hu-HU')} Ft</p>
-                  </div>
-
-                  <OrderStatus orderId={order.id} initialStatus={order.status} />
-                </div>
-              </div>
-
-              <div className="bg-[#0a0a0a] rounded-lg p-4">
-                <p className="text-xs text-gray-500 uppercase mb-3">Rendelt tételek</p>
-                <div className="space-y-3">
-                  {order.items.map((item: OrderItem & { product: Product | null }) => (
-                    <div key={item.id} className="flex justify-between items-center text-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl">{item.product?.image || '\u{1f4e6}'}</span>
-                        <span className="text-gray-300">
-                          {item.product?.name || 'Ismeretlen termék'}{' '}
-                          <span className="text-gray-600 ml-2">x{item.quantity}</span>
-                        </span>
-                      </div>
-                      <span className="text-gray-400">{(item.price * item.quantity).toLocaleString('hu-HU')} Ft</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 text-xs text-gray-500 flex gap-2">
-                <span className="inline-flex items-center gap-2">
-                  <MapPin size={14} className="opacity-70" /> Szállítási cím:
-                </span>
-                <span className="text-gray-400">{order.customerAddress}</span>
-              </div>
-            </div>
-          ))}
-
-          {recentOrders.length === 0 && (
-            <div className="text-center py-20 text-gray-500">Még nem érkezett rendelés.</div>
-          )}
-          
-          {recentOrders.length > 0 && (
-            <div className="text-center mt-8">
-              <Link 
-                href="/admin/orders" 
-                className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 font-medium transition-colors"
-              >
-                Összes rendelés megtekintése <ArrowRight size={16} />
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <AdminDashboardClient
+      stats={{
+        totalRevenue,
+        totalOrders,
+        pendingOrders,
+        totalUsers,
+        newUsers: weekUsers,
+        avgOrderValue: avgOrderByPeriod.total,
+        revenueChange: revenueByPeriod.month.change,
+        ordersChange: revenueByPeriod.month.ordersChange,
+        usersChange: usersByPeriod.week.change
+      }}
+      revenueByPeriod={revenueByPeriod}
+      usersByPeriod={usersByPeriod}
+      avgOrderByPeriod={avgOrderByPeriod}
+      dailyChartData={dailyChartData}
+      weeklyChartData={weeklyChartData}
+      monthlyChartData={monthlyChartData}
+      orderStatusData={orderStatusData}
+      topProducts={topProducts}
+      revenueByCategory={revenueByCategory}
+      hourlyDistribution={hourlyDistribution}
+      dayOfWeekDistribution={dayOfWeekDistribution}
+      conversionStats={{
+        visitors: totalVisitors,
+        cartAbandonment,
+        conversionRate: parseFloat(conversionRate)
+      }}
+      reviewStats={{
+        avgRating: reviewStats._avg.rating || 0,
+        totalReviews: reviewStats._count.id,
+        byRating: reviewsByRating.map(r => ({ rating: r.rating, count: r._count.id }))
+      }}
+      lowStockProducts={lowStockProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        stock: p.stock,
+        image: p.image
+      }))}
+      recentReviews={recentReviews.map(r => ({
+        id: r.id,
+        rating: r.rating,
+        text: r.text,
+        userName: r.userName,
+        productName: r.product.name,
+        createdAt: r.createdAt.toISOString()
+      }))}
+      recentOrders={recentOrders.map(order => ({
+        id: order.id,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        customerAddress: order.customerAddress,
+        totalPrice: order.totalPrice,
+        status: order.status,
+        createdAt: order.createdAt.toISOString(),
+        items: order.items.map(item => ({
+          id: item.id,
+          quantity: item.quantity,
+          price: item.price,
+          productName: item.product?.name || 'Ismeretlen',
+          productImage: item.product?.image || '📦'
+        }))
+      }))}
+      activities={activities}
+    />
   )
 }
 

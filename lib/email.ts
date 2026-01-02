@@ -740,3 +740,58 @@ export async function sendEmail({ to, subject, html }: { to: string, subject: st
     return { success: false, error }
   }
 }
+
+export async function sendPriceDropEmail(email: string, product: any) {
+  const resend = new Resend(process.env.RESEND_API_KEY)
+  const siteUrl = getSiteUrl()
+  const productUrl = `${siteUrl}/shop/${product.id}`
+  const subject = `Árcsökkenés: ${product.name} most akciós!`
+  const from = process.env.EMAIL_FROM || 'NEXU Store <onboarding@resend.dev>'
+
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0; padding:0; background:#0a0a0a; color:#ffffff; font-family: Arial, Helvetica, sans-serif;">
+    <div style="max-width:640px; margin:0 auto; padding:24px;">
+      <div style="background:#121212; border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:24px; text-align:center;">
+        <h1 style="margin:0 0 16px; font-size:24px; font-weight:bold;">Árcsökkenés!</h1>
+        <p style="margin:0 0 24px; color:#a3a3a3; line-height:1.5;">
+          Egy általad kedvelt termék ára csökkent!
+        </p>
+        
+        <div style="margin-bottom: 24px;">
+            <img src="${product.images[0] || ''}" alt="${product.name}" style="width: 100%; max-width: 300px; border-radius: 12px; object-fit: cover;" />
+        </div>
+
+        <h2 style="margin:0 0 8px; font-size:20px; font-weight:bold;">${product.name}</h2>
+        
+        <div style="margin-bottom: 24px;">
+            <span style="text-decoration: line-through; color: #737373; margin-right: 8px;">${product.price.toLocaleString('hu-HU')} Ft</span>
+            <span style="color: #ef4444; font-weight: bold; font-size: 20px;">${product.salePrice?.toLocaleString('hu-HU')} Ft</span>
+        </div>
+
+        <a href="${productUrl}" style="display:inline-block; background:#7c3aed; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:8px; font-weight:bold; margin-bottom:24px;">
+          Megnézem
+        </a>
+      </div>
+      <div style="text-align:center; margin-top:24px;">
+        <p style="margin:0; color:#525252; font-size:12px;">
+          © ${new Date().getFullYear()} NEXU Webshop
+        </p>
+      </div>
+    </div>
+  </body>
+</html>`
+
+  try {
+    await resend.emails.send({
+      from,
+      to: email,
+      subject,
+      html,
+    })
+    return { success: true }
+  } catch (error) {
+    console.error('Price drop email sending failed:', error)
+    return { success: false, error }
+  }
+}

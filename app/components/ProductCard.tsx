@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Star, Eye, ArrowLeftRight, Package } from 'lucide-react'
+import { Star, Eye, ArrowLeftRight, Package, ShoppingCart, Plus } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useCompare } from '@/context/CompareContext'
 import FavoriteButton from './FavoriteButton'
@@ -91,9 +91,13 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
 
   return (
     <>
-      <div className="group relative bg-[#0a0a0a] rounded-3xl border border-white/5 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 overflow-hidden flex flex-col h-full hover:-translate-y-2">
-        <Link href={`/shop/${product.id}`} className="block relative">
-          <div className="relative aspect-square bg-gradient-to-br from-[#1a1a1a] to-[#050505] flex items-center justify-center overflow-hidden p-4 md:p-8 group-hover:from-[#222] group-hover:to-[#0a0a0a] transition-colors duration-500">
+      <article 
+        className="group relative bg-[#0a0a0a] rounded-2xl md:rounded-3xl border border-white/5 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 overflow-hidden flex flex-col h-full md:hover:-translate-y-2"
+        aria-label={`${product.name} - ${currentPrice?.toLocaleString('hu-HU')} Ft`}
+      >
+        <Link href={`/shop/${product.id}`} className="block relative" aria-label={`${product.name} részletei`}>
+          <div className="relative aspect-square bg-gradient-to-br from-[#1a1a1a] to-[#050505] flex items-center justify-center overflow-hidden p-3 md:p-8 group-hover:from-[#222] group-hover:to-[#0a0a0a] transition-colors duration-500">
+            
             <div className="w-full h-full flex items-center justify-center transform group-hover:scale-110 transition-all duration-500 drop-shadow-2xl filter group-hover:brightness-110">
               {imageUrl ? (
                 <div className="relative w-full h-full">
@@ -120,19 +124,43 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
             {/* Overlay Gradient */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500" />
 
-            <div className="absolute top-4 left-4 flex flex-col gap-2 z-20">
+            {/* Overlay Actions - Slide Up */}
+            <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 z-20 flex justify-center gap-2">
+               <button
+                 onClick={handleAddToCart}
+                 disabled={isOutOfStock}
+                 className="flex-1 bg-white text-black font-bold py-3 rounded-xl shadow-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                 {hasVariants ? (
+                   <>
+                     <Eye size={18} />
+                     <span className="text-sm">Megtekintés</span>
+                   </>
+                 ) : (
+                   <>
+                     <ShoppingCart size={18} />
+                     <span className="text-sm">{isOutOfStock ? 'Elfogyott' : 'Kosárba'}</span>
+                   </>
+                 )}
+               </button>
+            </div>
+
+            <div className="absolute top-2 md:top-4 left-2 md:left-4 flex flex-wrap gap-1 md:gap-2 z-20 items-start max-w-[calc(100%-1rem)] md:max-w-[calc(100%-2rem)]">
               {isNew && (
-                <span className="px-3 py-1 bg-purple-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-lg shadow-purple-500/30 animate-in fade-in zoom-in duration-300">
+                <span className="px-2 md:px-3 py-0.5 md:py-1 bg-purple-600 text-white text-[8px] md:text-[10px] font-bold uppercase tracking-wider rounded-full shadow-lg shadow-purple-500/30">
                   Új
                 </span>
               )}
+              {currentPrice && currentPrice >= 20000 && (
+                <div className="hidden md:flex bg-green-500/20 backdrop-blur-md border border-green-500/30 text-green-400 text-[10px] font-bold px-2 py-1 rounded-full items-center gap-1 shadow-lg shadow-green-500/10">
+                  <Package size={10} />
+                  INGYEN SZÁLLÍTÁS
+                </div>
+              )}
               {isOnSale && (
                 <>
-                  <span className="px-3 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-lg shadow-red-500/30 animate-in fade-in zoom-in duration-300">
-                    Akció
-                  </span>
                   {discountPercentage > 0 && (
-                    <span className="px-3 py-1 bg-yellow-500 text-black text-[10px] font-bold uppercase tracking-wider rounded-full shadow-lg shadow-yellow-500/30 animate-in fade-in zoom-in duration-300">
+                    <span className="px-2 md:px-3 py-0.5 md:py-1 bg-red-600 text-white text-[8px] md:text-[10px] font-bold uppercase tracking-wider rounded-full shadow-lg shadow-red-500/30">
                       -{discountPercentage}%
                     </span>
                   )}
@@ -140,76 +168,78 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               )}
             </div>
 
-            <div className="absolute top-4 right-4 flex flex-col gap-2 z-20 translate-x-20 group-hover:translate-x-0 transition-transform duration-500 ease-out">
+            {/* Mobile: Show favorite button always, Desktop: Show all on hover */}
+            <div className="absolute top-2 md:top-4 right-2 md:right-4 flex flex-col gap-1.5 md:gap-2 z-20">
+              {/* Favorite - always visible */}
               <div className="transform transition-transform duration-300 hover:scale-110">
-                <FavoriteButton product={product} />
+                <FavoriteButton product={product} size="sm" />
               </div>
+              {/* Quick view - hidden on mobile, show on hover desktop */}
               <button
                 onClick={handleQuickView}
-                className="w-10 h-10 flex items-center justify-center bg-white/10 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-purple-600 hover:border-purple-500 transition-all duration-300 shadow-lg"
+                className="hidden md:flex w-10 h-10 items-center justify-center bg-white/10 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-purple-600 hover:border-purple-500 transition-all duration-300 shadow-lg translate-x-20 group-hover:translate-x-0"
                 title="Gyorsnézet"
+                aria-label={`${product.name} gyorsnézet`}
               >
-                <Eye size={18} />
+                <Eye size={18} aria-hidden="true" />
               </button>
+              {/* Compare - hidden on mobile, show on hover desktop */}
               <button
                 onClick={handleCompare}
-                className={`w-10 h-10 flex items-center justify-center backdrop-blur-md border rounded-full transition-all duration-300 shadow-lg ${
+                className={`hidden md:flex w-10 h-10 items-center justify-center backdrop-blur-md border rounded-full transition-all duration-300 shadow-lg translate-x-20 group-hover:translate-x-0 ${
                   isCompared 
-                    ? 'bg-purple-600 border-purple-500 text-white' 
+                    ? 'bg-purple-600 border-purple-500 text-white !translate-x-0' 
                     : 'bg-white/10 border-white/10 text-white hover:bg-purple-600 hover:border-purple-500'
                 }`}
                 title={isCompared ? "Eltávolítás az összehasonlításból" : "Összehasonlítás"}
+                aria-label={isCompared ? `${product.name} eltávolítása az összehasonlításból` : `${product.name} összehasonlítása`}
+                aria-pressed={isCompared}
               >
-                <ArrowLeftRight size={18} />
+                <ArrowLeftRight size={18} aria-hidden="true" />
               </button>
             </div>
           </div>
         </Link>
 
-        <div className="p-4 md:p-6 flex flex-col flex-grow relative z-10">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-medium text-purple-400 uppercase tracking-wider">{product.category}</span>
-            <div className="flex items-center gap-1">
-              <Star size={12} className="text-yellow-400 fill-yellow-400" />
-              <span className="text-xs font-bold text-white">{product.rating.toFixed(1)}</span>
-              <span className="text-[10px] text-gray-500">({reviewsCount})</span>
+        <div className="p-3 md:p-6 flex flex-col flex-grow relative z-10">
+          {/* Category & Rating row */}
+          <div className="mb-1 md:mb-2 flex items-center justify-between">
+            <span className="text-[10px] md:text-xs font-medium text-purple-400 uppercase tracking-wider truncate max-w-[60%]">{product.category}</span>
+            <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0">
+              <Star size={10} className="md:w-3 md:h-3 text-yellow-400 fill-yellow-400" />
+              <span className="text-[10px] md:text-xs font-bold text-white">{product.rating.toFixed(1)}</span>
+              <span className="hidden md:inline text-[10px] text-gray-500">({reviewsCount})</span>
             </div>
           </div>
 
+          {/* Product name */}
           <Link href={`/shop/${product.id}`} className="group-hover:text-purple-400 transition-colors duration-300">
-            <h3 className="text-base md:text-lg font-bold text-white mb-2 line-clamp-2 leading-tight">{product.name}</h3>
+            <h3 className="text-sm md:text-lg font-bold text-white mb-1 md:mb-2 line-clamp-2 leading-tight">{product.name}</h3>
           </Link>
           
-          <p className="text-xs md:text-sm text-gray-400 line-clamp-2 mb-4 flex-grow">{product.description}</p>
+          {/* Description - hidden on mobile */}
+          <p className="hidden md:block text-sm text-gray-400 line-clamp-2 mb-4 flex-grow">{product.description}</p>
 
-          <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between gap-4">
+          {/* Price section */}
+          <div className="mt-auto pt-2 md:pt-4 border-t border-white/5 flex items-center justify-between gap-2">
             <div className="flex flex-col">
               {isOnSale && (
-                <span className="text-xs text-gray-500 line-through decoration-red-500/50">
+                <span className="text-[10px] md:text-xs text-gray-500 line-through decoration-red-500/50">
                   {product.price.toLocaleString('hu-HU')} Ft
                 </span>
               )}
-              <span className={`text-lg md:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${isOnSale ? 'from-red-500 to-orange-500' : 'from-white to-gray-400'}`}>
+              <span className={`text-sm md:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${isOnSale ? 'from-red-500 to-orange-500' : 'from-white to-gray-400'}`}>
                 {currentPrice?.toLocaleString('hu-HU')} Ft
               </span>
             </div>
-
+            {/* Mobile add to cart button */}
             <button
               onClick={handleAddToCart}
               disabled={isOutOfStock}
-              className={`px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-300 shadow-lg transform active:scale-95 ${
-                isOutOfStock
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
-                  : hasVariants
-                    ? 'bg-white text-black hover:bg-gray-200 hover:shadow-white/10'
-                    : 'bg-purple-600 text-white hover:bg-purple-500 hover:shadow-purple-500/25'
-              }`}
+              className="md:hidden w-9 h-9 flex items-center justify-center bg-purple-600 hover:bg-purple-500 rounded-full text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label={hasVariants ? 'Megtekintés' : 'Kosárba'}
             >
-              {isOutOfStock 
-                ? 'Elfogyott' 
-                : hasVariants 
-                  ? 'Részletek' 
-                  : 'Kosárba'}
+              {hasVariants ? <Eye size={16} /> : <Plus size={18} />}
             </button>
           </div>
         </div>
@@ -218,7 +248,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           isOpen={isQuickViewOpen} 
           onClose={() => setIsQuickViewOpen(false)} 
         />
-      </div>
+      </article>
     </>
   )
 }

@@ -3,6 +3,8 @@ import { headers } from 'next/headers'
 import { subscribeToNewsletterService, NewsletterSchema } from '@/lib/services/newsletterService'
 import { z } from 'zod'
 import { enforceRateLimit, rateLimitExceededResponse } from '@/lib/enforceRateLimit' 
+import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(req: Request) {
   try {
@@ -11,12 +13,6 @@ export async function POST(req: Request) {
     if (!rl.success) return rateLimitExceededResponse(undefined, rl.reset)
 
     const body = await req.json()
-    
-    // Validate first to catch format errors before service call if needed, 
-    // but service also validates. 
-    // However, service throws error on validation fail if using .parse().
-    // Let's use safeParse here or handle error from service.
-    // The service uses .parse() so it throws ZodError.
     
     try {
         const result = await subscribeToNewsletterService(body)
@@ -31,5 +27,23 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('Newsletter error:', error)
     return NextResponse.json({ error: 'Hiba történt a feliratkozás során' }, { status: 500 })
+  }
+}
+
+export async function GET(req: Request) {
+  try {
+    const session = await auth()
+    if (session?.user?.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const subscribers = await prisma.newsletterSubscriber.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return NextResponse.json(subscribers)
+  } catch (error) {
+    console.error('Newsletter fetch error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

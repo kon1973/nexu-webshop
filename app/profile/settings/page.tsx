@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { User, Lock, Save, Loader2 } from 'lucide-react'
+import { User, Lock, Save, Loader2, ArrowLeft, Shield, Eye, EyeOff } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { updateProfile, changePassword } from '../actions'
 
 export default function SettingsPage() {
@@ -30,23 +31,39 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white pt-24 pb-12 font-sans">
+    <div className="min-h-screen bg-[#0a0a0a] text-white pt-20 md:pt-24 pb-12 font-sans">
       <div className="container mx-auto px-4 max-w-2xl">
-        <h1 className="text-3xl font-bold mb-8">Fiók beállítások</h1>
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <Link 
+            href="/profile" 
+            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </Link>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Fiók beállítások</h1>
+            <p className="text-gray-400 text-sm">Személyes adatok és biztonság</p>
+          </div>
+        </div>
 
-        <div className="bg-[#121212] border border-white/5 rounded-2xl p-8 mb-8">
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <User className="text-blue-400" /> Személyes adatok
+        {/* Profile Section */}
+        <div className="bg-[#121212] border border-white/5 rounded-2xl p-6 md:p-8 mb-6">
+          <h2 className="text-lg md:text-xl font-bold mb-6 flex items-center gap-2">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+              <User className="text-blue-400" size={20} />
+            </div>
+            <span>Személyes adatok</span>
           </h2>
 
-          <form onSubmit={handleUpdateProfile} className="space-y-6">
+          <form onSubmit={handleUpdateProfile} className="space-y-5">
             <div>
-              <label className="block text-sm font-bold text-gray-400 mb-2">Név</label>
+              <label className="block text-sm font-bold text-gray-400 mb-2">Teljes név</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-colors"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
                 placeholder="Teljes név"
               />
             </div>
@@ -57,7 +74,7 @@ export default function SettingsPage() {
                 type="email"
                 value={session?.user?.email || ''}
                 disabled
-                className="w-full bg-[#0a0a0a]/50 border border-white/5 rounded-xl p-4 text-gray-500 cursor-not-allowed"
+                className="w-full bg-white/5 border border-white/5 rounded-xl p-4 text-gray-500 cursor-not-allowed"
               />
               <p className="text-xs text-gray-500 mt-2">Az email cím nem módosítható.</p>
             </div>
@@ -65,19 +82,37 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={isLoading || name === session?.user?.name}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 w-full md:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? <Loader2 className="animate-spin" /> : <Save size={20} />}
+              {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
               Mentés
             </button>
           </form>
         </div>
 
-        <div className="bg-[#121212] border border-white/5 rounded-2xl p-8">
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <Lock className="text-blue-400" /> Jelszó módosítás
+        {/* Password Section */}
+        <div className="bg-[#121212] border border-white/5 rounded-2xl p-6 md:p-8">
+          <h2 className="text-lg md:text-xl font-bold mb-6 flex items-center gap-2">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+              <Shield className="text-purple-400" size={20} />
+            </div>
+            <span>Jelszó módosítás</span>
           </h2>
           <PasswordChangeForm />
+        </div>
+
+        {/* Danger Zone */}
+        <div className="mt-6 bg-red-500/5 border border-red-500/20 rounded-2xl p-6">
+          <h3 className="font-bold text-red-400 mb-2">Veszélyzóna</h3>
+          <p className="text-sm text-gray-400 mb-4">
+            A fiók törlése végleges és nem visszafordítható.
+          </p>
+          <button 
+            disabled
+            className="text-sm text-red-400 border border-red-500/30 px-4 py-2 rounded-xl hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Fiók törlése (hamarosan)
+          </button>
         </div>
       </div>
     </div>
@@ -89,6 +124,9 @@ function PasswordChangeForm() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -119,49 +157,122 @@ function PasswordChangeForm() {
     }
   }
 
+  // Password strength indicator
+  const getPasswordStrength = (password: string) => {
+    if (!password) return { level: 0, text: '', color: '' }
+    let strength = 0
+    if (password.length >= 8) strength++
+    if (password.length >= 12) strength++
+    if (/[A-Z]/.test(password)) strength++
+    if (/[0-9]/.test(password)) strength++
+    if (/[^A-Za-z0-9]/.test(password)) strength++
+    
+    if (strength <= 2) return { level: strength, text: 'Gyenge', color: 'bg-red-500' }
+    if (strength <= 3) return { level: strength, text: 'Közepes', color: 'bg-yellow-500' }
+    return { level: strength, text: 'Erős', color: 'bg-green-500' }
+  }
+
+  const strength = getPasswordStrength(newPassword)
+
   return (
-    <form onSubmit={handleChangePassword} className="space-y-6">
+    <form onSubmit={handleChangePassword} className="space-y-5">
       <div>
         <label className="block text-sm font-bold text-gray-400 mb-2">Jelenlegi jelszó</label>
-        <input
-          type="password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-colors"
-          placeholder="••••••••"
-          required
-        />
+        <div className="relative">
+          <input
+            type={showCurrent ? 'text' : 'password'}
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 pr-12 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
+            placeholder="••••••••"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowCurrent(!showCurrent)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+          >
+            {showCurrent ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
       </div>
+      
       <div>
         <label className="block text-sm font-bold text-gray-400 mb-2">Új jelszó</label>
-        <input
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-colors"
-          placeholder="Legalább 8 karakter"
-          required
-        />
+        <div className="relative">
+          <input
+            type={showNew ? 'text' : 'password'}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 pr-12 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
+            placeholder="Legalább 8 karakter"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowNew(!showNew)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+          >
+            {showNew ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
+        {newPassword && (
+          <div className="mt-2">
+            <div className="flex gap-1 mb-1">
+              {[1, 2, 3, 4, 5].map((level) => (
+                <div 
+                  key={level} 
+                  className={`h-1 flex-1 rounded-full transition-colors ${
+                    level <= strength.level ? strength.color : 'bg-white/10'
+                  }`}
+                />
+              ))}
+            </div>
+            <p className={`text-xs ${
+              strength.level <= 2 ? 'text-red-400' : 
+              strength.level <= 3 ? 'text-yellow-400' : 'text-green-400'
+            }`}>
+              Jelszó erőssége: {strength.text}
+            </p>
+          </div>
+        )}
       </div>
+      
       <div>
         <label className="block text-sm font-bold text-gray-400 mb-2">Új jelszó megerősítése</label>
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-colors"
-          placeholder="••••••••"
-          required
-        />
+        <div className="relative">
+          <input
+            type={showConfirm ? 'text' : 'password'}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className={`w-full bg-[#0a0a0a] border rounded-xl p-4 pr-12 text-white outline-none transition-all ${
+              confirmPassword && confirmPassword !== newPassword 
+                ? 'border-red-500 focus:border-red-500' 
+                : 'border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500'
+            }`}
+            placeholder="••••••••"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirm(!showConfirm)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+          >
+            {showConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
+        {confirmPassword && confirmPassword !== newPassword && (
+          <p className="text-xs text-red-400 mt-1">A jelszavak nem egyeznek</p>
+        )}
       </div>
 
       <button
         type="submit"
-        disabled={isLoading}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isLoading || !currentPassword || !newPassword || newPassword !== confirmPassword}
+        className="flex items-center justify-center gap-2 w-full md:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {isLoading ? <Loader2 className="animate-spin" /> : <Save size={20} />}
-        Jelszó mentése
+        {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Lock size={20} />}
+        Jelszó módosítása
       </button>
     </form>
   )

@@ -279,9 +279,10 @@ model CartItem {
 }
 
 model NewsletterSubscriber {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  email       String   @unique
+  createdAt   DateTime @default(now())
+  isActive    Boolean  @default(true)
 }
 
 model Category {
@@ -377,6 +378,16 @@ model WebhookEvent {
 
   @@index([provider])
   @@index([processed])
+}
+
+model Brand {
+  id          String   @id @default(cuid())
+  name        String
+  logo        String?  // URL to logo image
+  isVisible   Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 

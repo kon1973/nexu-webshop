@@ -2,16 +2,19 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { useRecentlyViewed } from '@/context/RecentlyViewedContext'
 import { useCompare } from '@/context/CompareContext'
-import { Check, Minus, Plus, ShoppingCart, Star, Heart, Share2, ArrowLeftRight, X, User, Package } from 'lucide-react'
+import { Check, Minus, Plus, ShoppingCart, Star, Heart, Share2, ArrowLeftRight, X, User, Package, ShieldCheck, Truck, CreditCard, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import FavoriteButton from '@/app/components/FavoriteButton'
 import ShareButton from '@/app/components/ShareButton'
 import ReviewForm from '@/app/components/ReviewForm'
+import CountdownTimer from '@/app/components/CountdownTimer'
 import type { Product, Review } from '@prisma/client'
 import { getImageUrl } from '@/lib/image'
+import { createPortal } from 'react-dom'
 
 type ProductOption = {
   id: string
@@ -41,8 +44,31 @@ type ProductWithDetails = Product & {
   specifications?: any
 }
 
+const colorMap: Record<string, string> = {
+  'Fekete': '#1a1a1a',
+  'Fehér': '#ffffff',
+  'Ezüst': '#e0e0e0',
+  'Arany': '#ffd700',
+  'Kék': '#3b82f6',
+  'Piros': '#ef4444',
+  'Zöld': '#22c55e',
+  'Sárga': '#eab308',
+  'Szürke': '#6b7280',
+  'Rózsaszín': '#ec4899',
+  'Lila': '#a855f7',
+  'Barna': '#78350f',
+  'Narancs': '#f97316',
+  'Éjfekete': '#1e293b',
+  'Csillagfény': '#f8fafc',
+  'Asztroszürke': '#4b5563',
+  'Grafit': '#374151',
+  'Sierra kék': '#93c5fd',
+  'Alpesi zöld': '#166534',
+}
+
 export default function ProductDetailsClient({ product, url }: { product: ProductWithDetails; url: string }) {
-  const { addToCart } = useCart()
+  const router = useRouter()
+  const { addToCart, openCart } = useCart()
   const { addProductToHistory } = useRecentlyViewed()
   const { addToCompare, removeFromCompare, isInCompare } = useCompare()
   const [quantity, setQuantity] = useState(1)
@@ -50,6 +76,7 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'reviews'>('description')
   const [showStickyBar, setShowStickyBar] = useState(false)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
   const addToCartRef = useRef<HTMLDivElement>(null)
 
   const isCompared = isInCompare(product.id)
@@ -139,12 +166,19 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
   const currentPrice = selectedVariant 
     ? (isVariantOnSale ? selectedVariant.salePrice : selectedVariant.price)
     : (isProductOnSale ? product.salePrice : product.price)
+
+  const currentSaleEndDate = selectedVariant 
+    ? (isVariantOnSale ? selectedVariant.saleEndDate : null)
+    : (isProductOnSale ? product.saleEndDate : null)
     
   const originalPrice = selectedVariant
     ? (isVariantOnSale ? selectedVariant.price : null)
     : (isProductOnSale ? product.price : null)
 
   const currentStock = selectedVariant ? selectedVariant.stock : product.stock
+
+  const stockPercentage = Math.min(100, Math.max(0, (currentStock / 50) * 100))
+  const stockColor = stockPercentage < 20 ? 'bg-red-500' : stockPercentage < 50 ? 'bg-yellow-500' : 'bg-green-500'
 
   // Calculate discount percentage
   let discountPercentage = 0
@@ -215,16 +249,74 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
       return
     }
 
-    toast.success(`${product.name} kosárba került! (+${added} db)`)
+    toast.success(`${product.name} kosárba került!`, {
+      description: `+${added} db hozzáadva`,
+      action: {
+        label: 'Megtekintés',
+        onClick: () => openCart()
+      }
+    })
+  }
+
+  const handleBuyNow = () => {
+    if (!allOptionsSelected) {
+      toast.error('Kérlek válassz minden opcióból!')
+      return
+    }
+
+    if (product.variants.length > 0 && !selectedVariant) {
+       toast.error('Ez a variáció jelenleg nem elérhető.')
+       return
+    }
+
+    addToCart(
+      {
+        id: product.id,
+        name: product.name,
+        price: currentPrice!,
+        originalPrice: originalPrice || undefined,
+        image: selectedImage,
+        category: product.category,
+        stock: currentStock,
+        variantId: selectedVariant?.id
+      },
+      quantity,
+      selectedOptions
+    )
+    
+    router.push('/checkout')
+  }
+
+  const allImages = useMemo(() => {
+    const imgs = [product.image, ...product.images].filter(Boolean)
+    // Deduplicate
+    return Array.from(new Set(imgs))
+  }, [product.image, product.images])
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const currentIndex = allImages.indexOf(selectedImage || allImages[0])
+    const nextIndex = (currentIndex + 1) % allImages.length
+    setSelectedImage(allImages[nextIndex])
+  }
+
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const currentIndex = allImages.indexOf(selectedImage || allImages[0])
+    const prevIndex = (currentIndex - 1 + allImages.length) % allImages.length
+    setSelectedImage(allImages[prevIndex])
   }
 
   return (
     <div className="space-y-20">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
       {/* Left Column: Images */}
-      <div className="space-y-4">
-        <div className="bg-[#121212] border border-white/5 rounded-3xl p-12 flex items-center justify-center relative group aspect-square overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="space-y-4 lg:sticky lg:top-24 h-fit">
+        <div 
+          className="bg-[#121212] border border-white/5 rounded-3xl p-8 md:p-12 flex items-center justify-center relative group aspect-square overflow-hidden shadow-2xl shadow-black/50 cursor-zoom-in"
+          onClick={() => setIsLightboxOpen(true)}
+        >
+          <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
           {/* Display selected image */}
           {getImageUrl(selectedImage) ? (
@@ -233,7 +325,7 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
                 src={getImageUrl(selectedImage)!}
                 alt={product.name}
                 fill
-                className="object-contain animate-in zoom-in duration-500 group-hover:scale-110 transition-transform"
+                className="object-contain animate-in zoom-in duration-500 group-hover:scale-105 transition-transform"
                 priority
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
@@ -242,12 +334,38 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
             <Package size={128} className="text-gray-500 animate-in zoom-in duration-500 group-hover:scale-110 transition-transform relative z-10" />
           )}
 
+          <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="bg-black/50 backdrop-blur-md p-2 rounded-full text-white">
+              <ZoomIn size={20} />
+            </div>
+          </div>
+
+          {allImages.length > 1 && (
+            <>
+              <button 
+                onClick={handlePrevImage}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <button 
+                onClick={handleNextImage}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <ChevronRight size={24} />
+              </button>
+            </>
+          )}
+
           {product.images.length > 0 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-              {[product.image, ...product.images].filter(Boolean).map((img, idx) => (
+              {allImages.map((img, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setSelectedImage(img)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedImage(img)
+                  }}
                   className={`w-2 h-2 rounded-full transition-all ${
                     selectedImage === img ? 'bg-purple-500 w-6' : 'bg-white/20 hover:bg-white/40'
                   }`}
@@ -258,14 +376,14 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
         </div>
 
         {/* Thumbnails */}
-        {product.images.length > 0 && (
+        {allImages.length > 1 && (
           <div className="grid grid-cols-4 gap-4">
-            {[product.image, ...product.images].filter(Boolean).map((img, idx) => (
+            {allImages.map((img, idx) => (
               <button
                 key={idx}
                 onClick={() => setSelectedImage(img)}
                 className={`aspect-square rounded-xl border-2 overflow-hidden transition-all relative ${
-                  selectedImage === img ? 'border-purple-500' : 'border-transparent opacity-50 hover:opacity-100'
+                  selectedImage === img ? 'border-purple-500 ring-2 ring-purple-500/20' : 'border-transparent opacity-50 hover:opacity-100'
                 }`}
               >
                 {getImageUrl(img) ? (
@@ -278,18 +396,21 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
               </button>
             ))}
           </div>
-        )}  <button
+        )}
+        
+        <div className="flex justify-center">
+            <button
                 onClick={handleCompare}
-                className={`p-3 rounded-full border transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors ${
                   isCompared
                     ? 'bg-purple-600 border-purple-500 text-white'
-                    : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
                 }`}
-                title={isCompared ? "Eltávolítás az összehasonlításból" : "Összehasonlítás"}
               >
-                <ArrowLeftRight size={20} />
-              </button>
-            
+                <ArrowLeftRight size={16} />
+                <span className="text-sm font-medium">{isCompared ? "Eltávolítás az összehasonlításból" : "Összehasonlítás"}</span>
+            </button>
+        </div>
       </div>
 
       {/* Right Column: Details */}
@@ -340,6 +461,10 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
               )}
             </div>
             
+            {isOnSale && currentSaleEndDate && (
+              <CountdownTimer targetDate={currentSaleEndDate} />
+            )}
+
             {/* Stock Status */}
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${isOutOfStock ? 'bg-red-500' : currentStock < 5 ? 'bg-yellow-500' : 'bg-green-500'}`} />
@@ -361,29 +486,64 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
         {/* Options / Variants */}
         {attributes.length > 0 && (
           <div className="space-y-6 border-t border-white/10 pt-6">
-            {attributes.map((opt: ProductOption) => (
-              <div key={opt.id}>
-                <h3 className="text-sm font-bold text-gray-300 mb-3 uppercase tracking-wider">{opt.name}</h3>
-                <div className="flex flex-wrap gap-3">
-                  {opt.values.map((val) => {
-                    const isSelected = selectedOptions[opt.name] === val
-                    return (
-                      <button
-                        key={val}
-                        onClick={() => handleOptionSelect(opt.name, val)}
-                        className={`px-6 py-2 rounded-xl border-2 font-medium transition-all ${
-                          isSelected
-                            ? 'border-purple-500 bg-purple-500/10 text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                            : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    )
-                  })}
+            {attributes.map((opt: ProductOption) => {
+              const isColor = opt.name.toLowerCase() === 'szín' || opt.name.toLowerCase() === 'color'
+              
+              return (
+                <div key={opt.id}>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider">{opt.name}</h3>
+                    {selectedOptions[opt.name] && (
+                      <span className="text-sm text-purple-400 font-medium">{selectedOptions[opt.name]}</span>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3">
+                    {opt.values.map((val) => {
+                      const isSelected = selectedOptions[opt.name] === val
+                      const colorHex = colorMap[val]
+                      
+                      if (isColor && colorHex) {
+                        return (
+                          <button
+                            key={val}
+                            onClick={() => handleOptionSelect(opt.name, val)}
+                            className={`w-10 h-10 rounded-full border-2 transition-all relative group ${
+                              isSelected
+                                ? 'border-purple-500 scale-110 shadow-[0_0_10px_rgba(168,85,247,0.5)]'
+                                : 'border-white/10 hover:border-white/50 hover:scale-105'
+                            }`}
+                            title={val}
+                            style={{ backgroundColor: colorHex }}
+                          >
+                            {val === 'Fehér' && <div className="absolute inset-0 rounded-full border border-black/10" />}
+                            {isSelected && (
+                              <div className={`absolute inset-0 flex items-center justify-center ${val === 'Fehér' || val === 'Csillagfény' ? 'text-black' : 'text-white'}`}>
+                                <Check size={16} strokeWidth={3} />
+                              </div>
+                            )}
+                          </button>
+                        )
+                      }
+
+                      return (
+                        <button
+                          key={val}
+                          onClick={() => handleOptionSelect(opt.name, val)}
+                          className={`px-6 py-2 rounded-xl border-2 font-medium transition-all ${
+                            isSelected
+                              ? 'border-purple-500 bg-purple-500/10 text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
+                              : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white bg-white/5'
+                          }`}
+                        >
+                          {val}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -408,17 +568,32 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
               </button>
             </div>
 
-            <div className="flex-1">
+            <div className="flex-1 flex gap-3">
               <button
                 onClick={handleAddToCart}
                 disabled={isOutOfStock || (attributes.length > 0 && !allOptionsSelected)}
-                className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]"
+                className="flex-1 bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]"
               >
                 <ShoppingCart size={20} />
-                {isOutOfStock ? 'Elfogyott' : 'Kosárba teszem'}
+                {isOutOfStock ? 'Elfogyott' : 'Kosárba'}
+              </button>
+              
+              <button
+                onClick={handleBuyNow}
+                disabled={isOutOfStock || (attributes.length > 0 && !allOptionsSelected)}
+                className="flex-1 bg-purple-600 text-white font-bold py-4 rounded-xl hover:bg-purple-500 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)]"
+              >
+                <CreditCard size={20} />
+                Vásárlás
               </button>
             </div>
           </div>
+          
+          {attributes.length > 0 && !allOptionsSelected && !isOutOfStock && (
+             <p className="text-yellow-400 text-sm font-medium text-center animate-pulse bg-yellow-400/10 p-2 rounded-lg border border-yellow-400/20">
+               Kérlek válassz a fenti opciók közül a vásárláshoz!
+             </p>
+          )}
           
           {isOutOfStock && (
             <p className="text-red-400 text-sm text-center font-medium">
@@ -426,26 +601,53 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
             </p>
           )}
           
-          {currentStock > 0 && currentStock < 5 && (
-             <p className="text-yellow-400 text-sm text-center font-medium">
-               Siess! Már csak {currentStock} db maradt készleten!
-             </p>
+          {currentStock > 0 && (
+             <div className="space-y-2">
+               <div className="flex justify-between text-xs font-medium">
+                 <span className={`${currentStock < 5 ? 'text-red-400' : 'text-green-400'}`}>
+                   {currentStock < 5 ? `Már csak ${currentStock} db maradt!` : 'Készleten'}
+                 </span>
+               </div>
+               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                 <div 
+                   className={`h-full ${stockColor} transition-all duration-500`} 
+                   style={{ width: `${stockPercentage}%` }}
+                 />
+               </div>
+             </div>
           )}
         </div>
 
         {/* Features / Trust Badges */}
-        <div className="grid grid-cols-2 gap-4 pt-6">
-          <div className="flex items-center gap-3 text-gray-400">
-            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-purple-400">
-              <Check size={20} />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-white/10">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+            <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400 flex-shrink-0">
+              <Truck size={20} />
             </div>
-            <span className="text-sm">Raktáron, azonnal szállítható</span>
+            <div>
+              <p className="text-xs text-gray-400">Szállítás</p>
+              <p className="text-sm font-bold text-white">Ingyenes 20e Ft+</p>
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-gray-400">
-            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-purple-400">
-              <Check size={20} />
+          
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 flex-shrink-0">
+              <ShieldCheck size={20} />
             </div>
-            <span className="text-sm">Ingyenes szállítás 20e Ft felett</span>
+            <div>
+              <p className="text-xs text-gray-400">Garancia</p>
+              <p className="text-sm font-bold text-white">2 év garancia</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+            <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-400 flex-shrink-0">
+              <CreditCard size={20} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Fizetés</p>
+              <p className="text-sm font-bold text-white">Biztonságos</p>
+            </div>
           </div>
         </div>
       </div>
@@ -509,6 +711,7 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
                             </tr>
                           )
                         }
+
                         return (
                           <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                             <td className="py-4 pr-4 text-gray-400 font-medium w-1/3 align-top group-hover:text-gray-200 transition-colors">{spec.key}</td>
@@ -545,9 +748,46 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
             {activeTab === 'reviews' && (
               <div className="max-w-4xl mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                  <div className="md:col-span-1">
-                    <h3 className="text-2xl font-bold text-white mb-6">Írd meg a véleményed</h3>
-                    <ReviewForm productId={product.id} />
+                  <div className="md:col-span-1 space-y-8">
+                    {/* Rating Distribution */}
+                    {product.reviews && product.reviews.length > 0 && (
+                      <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
+                        <div className="text-center mb-6">
+                          <div className="text-5xl font-bold text-white mb-2">{product.rating.toFixed(1)}</div>
+                          <div className="flex justify-center gap-1 text-yellow-400 mb-2">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} size={20} fill={i < Math.round(product.rating) ? 'currentColor' : 'none'} />
+                            ))}
+                          </div>
+                          <p className="text-sm text-gray-400">{product.reviews.length} értékelés alapján</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {[5, 4, 3, 2, 1].map((star) => {
+                            const count = product.reviews!.filter(r => r.rating === star).length
+                            const percentage = (count / product.reviews!.length) * 100
+                            return (
+                              <div key={star} className="flex items-center gap-3 text-sm">
+                                <span className="w-3 font-bold text-white">{star}</span>
+                                <Star size={12} className="text-gray-500" />
+                                <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-yellow-400 rounded-full" 
+                                    style={{ width: `${percentage}%` }}
+                                  />
+                                </div>
+                                <span className="w-8 text-right text-gray-500">{count}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-4">Írd meg a véleményed</h3>
+                      <ReviewForm productId={product.id} />
+                    </div>
                   </div>
                   
                   <div className="md:col-span-2 space-y-6">
@@ -617,11 +857,13 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
       <div className={`fixed bottom-0 left-0 w-full bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 p-4 z-50 transition-transform duration-300 ${showStickyBar ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="container mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-             <div className="w-12 h-12 rounded-lg bg-white p-1">
-               <img 
+             <div className="w-12 h-12 rounded-lg bg-white p-1 relative overflow-hidden">
+               <Image 
                  src={getImageUrl(selectedImage) || '/placeholder.png'} 
                  alt={product.name} 
-                 className="w-full h-full object-contain" 
+                 fill
+                 sizes="48px"
+                 className="object-contain" 
                />
              </div>
              <div className="hidden md:block">
@@ -660,6 +902,67 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
           </div>
         </div>
       </div>
+      {/* Lightbox Modal */}
+      {isLightboxOpen && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-200">
+          <button 
+            onClick={() => setIsLightboxOpen(false)}
+            className="absolute top-4 right-4 p-2 text-white/50 hover:text-white transition-colors z-50"
+          >
+            <X size={32} />
+          </button>
+
+          <div className="relative w-full h-full max-w-7xl max-h-[90vh] p-4 flex items-center justify-center">
+             {getImageUrl(selectedImage) && (
+               <div className="relative w-full h-full">
+                 <Image
+                   src={getImageUrl(selectedImage)!}
+                   alt={product.name}
+                   fill
+                   className="object-contain"
+                   priority
+                   sizes="100vw"
+                 />
+               </div>
+             )}
+             
+             {allImages.length > 1 && (
+               <>
+                 <button 
+                   onClick={handlePrevImage}
+                   className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white p-4 rounded-full backdrop-blur-md transition-all"
+                 >
+                   <ChevronLeft size={32} />
+                 </button>
+                 <button 
+                   onClick={handleNextImage}
+                   className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white p-4 rounded-full backdrop-blur-md transition-all"
+                 >
+                   <ChevronRight size={32} />
+                 </button>
+               </>
+             )}
+
+             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 overflow-x-auto max-w-full px-4 py-2">
+                {allImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedImage(img)
+                    }}
+                    className={`w-16 h-16 relative rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
+                      selectedImage === img ? 'border-purple-500 opacity-100' : 'border-transparent opacity-50 hover:opacity-100'
+                    }`}
+                  >
+                    <Image src={getImageUrl(img)!} alt="" fill className="object-cover" />
+                  </button>
+                ))}
+             </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

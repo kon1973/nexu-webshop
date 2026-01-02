@@ -109,9 +109,10 @@ This document outlines the necessary steps to prepare the Nexu Webshop for produ
 - **Plan:** Add `manifest.json` and Service Workers using `next-pwa`.
 
 ### 7.4. Marketing Automation
-- **Status:** ⏳ PENDING
+- **Status:** 🚧 IN PROGRESS
 - **Goal:** Increase conversion rates.
 - **Plan:** Implement abandoned cart recovery emails and wishlist price drop alerts.
+- **Progress:** Abandoned cart recovery implemented. Wishlist price drop alerts implemented.
 
 ### 7.5. Infrastructure Scaling
 - **Status:** ⏳ PENDING

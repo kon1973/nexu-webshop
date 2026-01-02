@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Mail, MapPin, Phone, Loader2, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { sendContactMessage } from './actions'
 
 interface ContactClientProps {
   settings: Record<string, string>
@@ -18,21 +19,16 @@ export default function ContactClient({ settings }: ContactClientProps) {
 
     const formData = new FormData(e.currentTarget)
     const data = {
-      name: formData.get('name'),
-      email: formData.get('email'),
-      message: formData.get('message'),
+      name: formData.get('name') as string,
+      email: formData.get('email') as string,
+      subject: formData.get('subject') as string || 'Kapcsolatfelvétel',
+      message: formData.get('message') as string,
     }
 
     try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+      const result = await sendContactMessage(data)
 
-      const result = await res.json()
-
-      if (res.ok) {
+      if (result.success) {
         setIsSuccess(true)
         toast.success(result.message || 'Üzenet elküldve!')
       } else {

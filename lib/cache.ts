@@ -43,6 +43,17 @@ export const getBanners = unstable_cache(
   { tags: [CACHE_TAGS.banners], revalidate: 3600 }
 )
 
+export const getPromoBanner = unstable_cache(
+  async () => {
+    return await prisma.banner.findFirst({
+      where: { isActive: true, location: 'HOME_PROMO' },
+      orderBy: { order: 'asc' },
+    })
+  },
+  ['banner-promo'],
+  { tags: [CACHE_TAGS.banners], revalidate: 3600 }
+)
+
 export const getFeaturedProducts = unstable_cache(
   async () => {
     return await prisma.product.findMany({
@@ -77,4 +88,34 @@ export const getNewArrivals = unstable_cache(
   },
   ['new-arrivals'],
   { tags: [CACHE_TAGS.products], revalidate: 3600 }
+)
+
+export const getLatestBlogPosts = unstable_cache(
+  async () => {
+    // @ts-ignore
+    return await prisma.blogPost.findMany({
+      where: { published: true },
+      take: 3,
+      orderBy: { createdAt: 'desc' },
+    })
+  },
+  ['latest-blog-posts'],
+  { revalidate: 3600 }
+)
+
+export const getLatestReviews = unstable_cache(
+  async () => {
+    return await prisma.review.findMany({
+      where: { status: 'approved', rating: 5 },
+      take: 3,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: { name: true, image: true }
+        }
+      }
+    })
+  },
+  ['latest-reviews'],
+  { revalidate: 3600 }
 )

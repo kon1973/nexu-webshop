@@ -56,47 +56,49 @@ export async function createOrder(data: CreateOrderInput) {
             metadata: { orderId: order.id }
           })
         }
-      } else if (paymentMethod === 'cod') {
-        // Send emails
-        await sendOrderEmails({
-          orderId: order.id,
-          customerName,
-          customerEmail,
-          customerAddress,
-          paymentMethod: 'cod',
-          items: order.items.map((item: any) => {
-            const product = productById.get(item.productId!) as any
-            let name = product.name
-            let image = product.image
-            
-            if (item.variantId) {
-              const variant = variantById.get(item.variantId) as any
-              if (variant && variant.images && variant.images.length > 0) {
-                image = variant.images[0]
-              }
-            }
-            
-            if (item.selectedOptions && typeof item.selectedOptions === 'object') {
-               const options = Object.entries(item.selectedOptions as Record<string, string>)
-                  .map(([key, value]) => `${key}: ${value}`)
-                  .join(', ')
-               if (options) {
-                   name += ` (${options})`
-               }
-            }
-
-            return {
-              name: name,
-              quantity: item.quantity,
-              unitPrice: item.price, // Price from DB (already effective price)
-              image: image
-            }
-          }),
-          subtotal,
-          shippingCost,
-          totalPrice,
-        })
       }
+      
+      // Send order confirmation emails for all payment methods
+      const emailItems = order.items.map((item: any) => {
+        const product = productById.get(item.productId!) as any
+        let name = product.name
+        let image = product.image
+        
+        if (item.variantId) {
+          const variant = variantById.get(item.variantId) as any
+          if (variant && variant.images && variant.images.length > 0) {
+            image = variant.images[0]
+          }
+        }
+        
+        if (item.selectedOptions && typeof item.selectedOptions === 'object') {
+          const options = Object.entries(item.selectedOptions as Record<string, string>)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ')
+          if (options) {
+            name += ` (${options})`
+          }
+        }
+
+        return {
+          name: name,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          image: image
+        }
+      })
+      
+      await sendOrderEmails({
+        orderId: order.id,
+        customerName,
+        customerEmail,
+        customerAddress,
+        paymentMethod: paymentMethod,
+        items: emailItems,
+        subtotal,
+        shippingCost,
+        totalPrice,
+      })
     } catch (sideEffectError) {
       logger.error('Order side effect error:', sideEffectError)
       // Don't fail the order if email/stripe update fails, but log it

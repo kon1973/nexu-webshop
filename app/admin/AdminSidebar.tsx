@@ -18,7 +18,8 @@ import {
   Tag,
   Image as ImageIcon,
   FileText,
-  Sliders
+  Sliders,
+  Star
 } from 'lucide-react'
 import { useState } from 'react'
 import { signOut } from 'next-auth/react'
@@ -35,6 +36,7 @@ const menuItems = [
   { name: 'Blog', href: '/admin/blog', icon: FileText },
   { name: 'Kategóriák', href: '/admin/categories', icon: Tag },
   { name: 'Bannerek', href: '/admin/banners', icon: ImageIcon },
+  { name: 'Márkák', href: '/admin/brands', icon: Star },
   { name: 'Specifikációk', href: '/admin/specifications', icon: FileText },
   { name: 'Jellemzők', href: '/admin/attributes', icon: Sliders },
   { name: 'Beállítások', href: '/admin/settings', icon: Settings },

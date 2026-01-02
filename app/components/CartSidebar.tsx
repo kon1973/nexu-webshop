@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, ShoppingBag, Trash2, X, Package } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
@@ -9,6 +11,48 @@ import { getImageUrl } from '@/lib/image'
 export default function CartSidebar() {
   const { cart, itemCount, removeFromCart, updateQuantity, isCartOpen, closeCart, clearCart } = useCart()
   const { getNumberSetting } = useSettings()
+  const sidebarRef = useRef<HTMLElement>(null)
+
+  // Focus trap
+  useEffect(() => {
+    if (isCartOpen) {
+      const sidebar = sidebarRef.current
+      if (!sidebar) return
+
+      const focusableElements = sidebar.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      const firstElement = focusableElements[0] as HTMLElement
+      const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
+
+      const handleTabKey = (e: KeyboardEvent) => {
+        if (e.key === 'Tab') {
+          if (e.shiftKey) {
+            if (document.activeElement === firstElement) {
+              e.preventDefault()
+              lastElement.focus()
+            }
+          } else {
+            if (document.activeElement === lastElement) {
+              e.preventDefault()
+              firstElement.focus()
+            }
+          }
+        }
+        if (e.key === 'Escape') {
+          closeCart()
+        }
+      }
+
+      document.addEventListener('keydown', handleTabKey)
+      // Small delay to ensure visibility before focusing
+      setTimeout(() => firstElement?.focus(), 50)
+
+      return () => {
+        document.removeEventListener('keydown', handleTabKey)
+      }
+    }
+  }, [isCartOpen, closeCart])
 
   const freeShippingThreshold = getNumberSetting('free_shipping_threshold', 20000)
   const shippingFee = getNumberSetting('shipping_fee', 2990)
@@ -31,6 +75,7 @@ export default function CartSidebar() {
       />
 
       <aside
+        ref={sidebarRef}
         className={`fixed top-0 right-0 h-full w-full sm:w-[400px] bg-[#121212] border-l border-white/10 z-[70] shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col ${
           isCartOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
@@ -63,6 +108,29 @@ export default function CartSidebar() {
           </div>
         </div>
 
+        {/* Free Shipping Progress Bar */}
+        <div className="px-6 py-4 bg-[#1a1a1a] border-b border-white/5">
+          {hasFreeShipping ? (
+            <div className="flex items-center gap-2 text-green-400 font-bold text-sm animate-pulse">
+              <Package size={18} />
+              <span>Gratulálunk! A szállítás ingyenes!</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>Ingyenes szállításig még:</span>
+                <span className="font-bold text-white">{missingForFree.toLocaleString('hu-HU')} Ft</span>
+              </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-600 to-blue-500 transition-all duration-500 ease-out"
+                  style={{ width: `${freeShippingProgress * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
@@ -82,7 +150,13 @@ export default function CartSidebar() {
                 <div key={`${item.id}-${JSON.stringify(item.selectedOptions)}`} className="flex gap-4">
                   <div className="w-20 h-20 bg-[#0a0a0a] rounded-lg border border-white/5 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden relative">
                     {getImageUrl(item.image) ? (
-                      <img src={getImageUrl(item.image)!} alt={item.name} className="w-full h-full object-contain" />
+                      <Image 
+                        src={getImageUrl(item.image)!} 
+                        alt={item.name} 
+                        fill
+                        sizes="80px"
+                        className="object-contain" 
+                      />
                     ) : (
                       <Package size={24} className="text-gray-500" />
                     )}

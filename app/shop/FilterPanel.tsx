@@ -19,7 +19,7 @@ type Props = {
   toggleFavoritesOnly: () => void
   favoritesCount: number
   onReset: () => void
-  categories?: { name: string }[]
+  categories?: { name: string; slug: string }[]
 }
 
 export default function FilterPanel({
@@ -46,34 +46,57 @@ export default function FilterPanel({
 
   return (
     <>
-      {/* Mobile Filter Toggle */}
-      <div className="lg:hidden sticky top-[72px] z-30 bg-[#0a0a0a]/80 backdrop-blur-xl pb-4 pt-2">
+      {/* Mobile Filter Toggle - Fixed at bottom */}
+      <div className="lg:hidden fixed bottom-4 left-4 right-4 z-40">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-center gap-2 bg-white text-black p-4 rounded-xl font-bold shadow-lg shadow-white/5 hover:bg-gray-200 transition-all active:scale-[0.98]"
+          className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 rounded-2xl font-bold shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transition-all active:scale-[0.98]"
         >
           <Filter size={20} /> 
-          Szűrők és rendezés
+          <span>Szűrők</span>
           {(category || searchTerm || minPrice > 0 || maxPrice < maxLimit || showFavoritesOnly) && (
-            <span className="w-2 h-2 bg-purple-600 rounded-full animate-pulse" />
+            <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">Aktív</span>
           )}
         </button>
       </div>
 
-      {/* Mobile Filter Overlay */}
+      {/* Mobile Filter Overlay - Full screen bottom sheet */}
       {isOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
-          <div className="absolute inset-y-0 right-0 w-full max-w-xs bg-[#121212] border-l border-white/10 p-6 overflow-y-auto shadow-2xl animate-in slide-in-from-right duration-300">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-xl font-bold text-white">Szűrők</h2>
-              <button onClick={() => setIsOpen(false)} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] bg-[#0a0a0a] border-t border-white/10 rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col">
+            {/* Handle bar */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-12 h-1.5 bg-white/20 rounded-full" />
+            </div>
+            
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pb-4 border-b border-white/10">
+              <h2 className="text-xl font-bold text-white">Szűrők és rendezés</h2>
+              <button 
+                onClick={() => setIsOpen(false)} 
+                className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 text-white transition-colors"
+              >
                 <X size={20} />
               </button>
             </div>
-            <FilterContent 
-              {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories }} 
-            />
+            
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto p-5 pb-24">
+              <FilterContent 
+                {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories }} 
+              />
+            </div>
+            
+            {/* Fixed apply button */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a] to-transparent pt-8">
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl shadow-lg shadow-purple-500/30"
+              >
+                Szűrők alkalmazása
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -88,9 +111,28 @@ export default function FilterPanel({
   )
 }
 
+type FilterContentProps = {
+  searchTerm: string
+  setSearchTerm: (value: string) => void
+  category: string
+  setCategory: (value: string) => void
+  sort: string
+  setSort: (value: string) => void
+  minPrice: number
+  setMinPrice: (value: number) => void
+  maxPrice: number
+  setMaxPrice: (value: number) => void
+  maxLimit: number
+  showFavoritesOnly: boolean
+  toggleFavoritesOnly: () => void
+  favoritesCount: number
+  onReset: () => void
+  categories: { name: string; slug: string }[]
+}
+
 function FilterContent({
   searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories
-}: any) {
+}: FilterContentProps) {
   return (
     <div className="space-y-8">
       <div>
@@ -166,9 +208,9 @@ function FilterContent({
             {category === '' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
           </button>
 
-          {categories.map((cat: { name: string }) => (
+          {categories.map((cat) => (
             <button
-              key={cat.name}
+              key={cat.slug || cat.name}
               type="button"
               onClick={() => setCategory(cat.name)}
               className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center justify-between group ${

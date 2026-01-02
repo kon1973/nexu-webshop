@@ -226,7 +226,8 @@ export default function BannerListClient({ banners: initialBanners }: { banners:
                     onChange={(e) => setNewLocation(e.target.value)}
                     className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-3 text-white focus:border-pink-500 outline-none"
                   >
-                    <option value="HOME">Főoldal</option>
+                    <option value="HOME">Főoldal (Slider)</option>
+                    <option value="HOME_PROMO">Főoldal (Kiemelt)</option>
                     <option value="SHOP">Shop</option>
                   </select>
                 </div>

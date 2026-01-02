@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, CreditCard, Mail, MapPin, Package, Truck, User } from 'lucide-react'
+import { ArrowLeft, Calendar, CreditCard, Mail, MapPin, Package, Truck, User, FileText, Download, Loader2 } from 'lucide-react'
 import type { Order, OrderItem, Product, User as PrismaUser, OrderNote } from '@prisma/client'
 import { useRouter } from 'next/navigation'
 import OrderNotes from './OrderNotes'
+import { toast } from 'sonner'
 
 type OrderWithDetails = Order & {
   user: PrismaUser | null
@@ -17,6 +18,34 @@ export default function OrderDetailsClient({ order }: { order: OrderWithDetails 
   const router = useRouter()
   const [status, setStatus] = useState(order.status)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false)
+  const [invoiceUrl, setInvoiceUrl] = useState(order.invoiceUrl)
+
+  const handleGenerateInvoice = async () => {
+    if (isGeneratingInvoice) return
+    
+    setIsGeneratingInvoice(true)
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}/invoice`, {
+        method: 'POST',
+      })
+
+      const data = await res.json()
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Hiba történt a számla generálásakor')
+      }
+      
+      setInvoiceUrl(data.invoiceUrl)
+      toast.success('Számla sikeresen kiállítva!')
+      router.refresh()
+    } catch (error: any) {
+      console.error(error)
+      toast.error(error.message || 'Hiba történt a számla generálásakor')
+    } finally {
+      setIsGeneratingInvoice(false)
+    }
+  }
 
   const handleStatusChange = async (newStatus: string) => {
     if (newStatus === status) return
@@ -145,6 +174,55 @@ export default function OrderDetailsClient({ order }: { order: OrderWithDetails 
                   {order.paymentMethod === 'cod' ? 'Utánvét' : order.paymentMethod}
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Invoice Section */}
+          <div className="bg-[#121212] border border-white/5 rounded-2xl p-6">
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-orange-400">
+              <FileText size={20} /> Számlázás
+            </h2>
+            <div className="space-y-3">
+              {invoiceUrl ? (
+                <>
+                  <div className="flex items-center gap-2 text-green-400 text-sm mb-3">
+                    <FileText size={16} />
+                    <span>Számla kiállítva</span>
+                  </div>
+                  <a
+                    href={invoiceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl font-medium transition-colors text-sm"
+                  >
+                    <Download size={16} />
+                    Számla letöltése
+                  </a>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-400 mb-3">
+                    Még nincs számla kiállítva ehhez a rendeléshez.
+                  </p>
+                  <button
+                    onClick={handleGenerateInvoice}
+                    disabled={isGeneratingInvoice}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:bg-orange-600/50 text-white rounded-xl font-medium transition-colors text-sm disabled:cursor-not-allowed"
+                  >
+                    {isGeneratingInvoice ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Generálás...
+                      </>
+                    ) : (
+                      <>
+                        <FileText size={16} />
+                        Számla kiállítása
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 

@@ -139,16 +139,14 @@ export default function ShopClient({
         </div>
       )}
 
-      <div className="container mx-auto px-4 pb-24 pt-8">
+      <div className="container mx-auto px-4 pb-32 lg:pb-24 pt-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          <aside className="w-full lg:w-72 flex-shrink-0">
+          {/* Desktop Filter Sidebar */}
+          <aside className="w-full lg:w-72 flex-shrink-0 hidden lg:block">
             <div className="sticky top-24 space-y-8">
-              <div className="lg:hidden">
-                 {/* Mobile Filter Toggle Placeholder - handled in FilterPanel */}
-              </div>
               <FilterPanel
                 searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm} // Local state update
+                setSearchTerm={setSearchTerm}
                 category={selectedCategorySlug}
                 setCategory={(val) => updateFilter('category', val)}
                 sort={currentSort}
@@ -158,45 +156,75 @@ export default function ShopClient({
                 maxPrice={currentMaxPrice}
                 setMaxPrice={(val) => updateFilter('maxPrice', val)}
                 maxLimit={globalMaxPrice}
-                showFavoritesOnly={false} // Disabled
-                toggleFavoritesOnly={() => router.push('/favorites')} // Redirect to favorites page
+                showFavoritesOnly={false}
+                toggleFavoritesOnly={() => router.push('/favorites')}
                 favoritesCount={favorites.length}
                 onReset={handleReset}
-                categories={categories} // Pass categories
+                categories={categories}
               />
             </div>
           </aside>
 
           <main className="flex-grow">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            {/* Mobile header with category and count */}
+            <div className="flex items-center justify-between mb-4 md:mb-6">
+              <h2 className="text-lg md:text-2xl font-bold text-white flex items-center gap-2 md:gap-3 flex-wrap">
                 {currentCategory?.name || 'Összes termék'}
-                <span className="text-sm font-normal text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                <span className="text-xs md:text-sm font-normal text-gray-500 bg-white/5 px-2 md:px-3 py-1 rounded-full border border-white/5">
                   {totalCount} termék
                 </span>
               </h2>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-6">
+            {/* Active filters on mobile */}
+            {(selectedCategorySlug || searchTerm || currentMinPrice > 0 || currentMaxPrice < globalMaxPrice) && (
+              <div className="flex flex-wrap gap-2 mb-4 lg:hidden">
+                {selectedCategorySlug && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full">
+                    {selectedCategorySlug}
+                    <button onClick={() => updateFilter('category', '')} className="hover:text-white">
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {searchTerm && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full">
+                    "{searchTerm}"
+                    <button onClick={() => { setSearchTerm(''); updateFilter('search', ''); }} className="hover:text-white">
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {(currentMinPrice > 0 || currentMaxPrice < globalMaxPrice) && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
+                    {currentMinPrice.toLocaleString('hu-HU')} - {currentMaxPrice.toLocaleString('hu-HU')} Ft
+                    <button onClick={() => { updateFilter('minPrice', 0); updateFilter('maxPrice', globalMaxPrice); }} className="hover:text-white">
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6">
               {products.map((product, index) => (
                 <ProductCard key={product.id} product={product} priority={index < 4} />
               ))}
 
               {products.length === 0 && (
-                <div className="col-span-full flex flex-col items-center justify-center py-24 text-center bg-[#121212] rounded-3xl border border-white/5 border-dashed">
-                  <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 animate-pulse">
-                    <SearchX size={48} className="text-gray-500" />
+                <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24 text-center bg-[#121212] rounded-2xl md:rounded-3xl border border-white/5 border-dashed">
+                  <div className="w-16 md:w-24 h-16 md:h-24 bg-white/5 rounded-full flex items-center justify-center mb-4 md:mb-6 animate-pulse">
+                    <SearchX size={32} className="md:w-12 md:h-12 text-gray-500" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Nincs találat</h3>
-                  <p className="text-gray-400 max-w-md mb-8 text-lg">
+                  <h3 className="text-xl md:text-2xl font-bold text-white mb-2 md:mb-3">Nincs találat</h3>
+                  <p className="text-sm md:text-lg text-gray-400 max-w-md mb-6 md:mb-8 px-4">
                     Sajnos nem találtunk a keresési feltételeknek megfelelő terméket.
-                    Próbáld meg módosítani a szűrőket.
                   </p>
                   <button
                     onClick={handleReset}
-                    className="flex items-center gap-2 px-8 py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all hover:scale-105"
+                    className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all text-sm md:text-base"
                   >
-                    <X size={20} /> Szűrők törlése
+                    <X size={18} /> Szűrők törlése
                   </button>
                 </div>
               )}
@@ -204,24 +232,27 @@ export default function ShopClient({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex justify-center mt-16 gap-2">
+              <div className="flex justify-center mt-8 md:mt-16 gap-1 md:gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage <= 1}
-                  className="p-3 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Előző oldal"
+                  className="p-2 md:p-3 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <ChevronLeft size={20} />
+                  <ChevronLeft size={18} className="md:w-5 md:h-5" />
                 </button>
                 
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                  // Show limited pages if too many
                   if (totalPages > 7) {
-                    if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
-                       // show page
-                    } else if (page === currentPage - 2 || page === currentPage + 2) {
-                       return <span key={page} className="px-2 py-2 text-gray-500">...</span>
-                    } else {
-                       return null
+                    const showPage = page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)
+                    const showEllipsis = page === currentPage - 2 || page === currentPage + 2
+                    
+                    if (!showPage && !showEllipsis) {
+                      return null
+                    }
+                    
+                    if (showEllipsis) {
+                      return <span key={page} className="px-1.5 md:px-2 py-2 text-gray-500 text-sm" aria-hidden="true">...</span>
                     }
                   }
                   
@@ -229,7 +260,9 @@ export default function ShopClient({
                     <button
                       key={page}
                       onClick={() => handlePageChange(page)}
-                      className={`w-10 h-10 rounded-xl font-bold transition-all ${
+                      aria-label={`${page}. oldal`}
+                      aria-current={currentPage === page ? 'page' : undefined}
+                      className={`w-8 h-8 md:w-10 md:h-10 rounded-xl font-bold text-sm md:text-base transition-all ${
                         currentPage === page
                           ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
                           : 'bg-[#121212] border border-white/10 hover:bg-white/5 text-gray-400'
@@ -243,13 +276,36 @@ export default function ShopClient({
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage >= totalPages}
-                  className="p-3 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Következő oldal"
+                  className="p-2 md:p-3 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <ChevronRight size={20} />
+                  <ChevronRight size={18} className="md:w-5 md:h-5" />
                 </button>
               </div>
             )}
           </main>
+        </div>
+        
+        {/* Mobile Filter Panel */}
+        <div className="lg:hidden">
+          <FilterPanel
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            category={selectedCategorySlug}
+            setCategory={(val) => updateFilter('category', val)}
+            sort={currentSort}
+            setSort={(val) => updateFilter('sort', val)}
+            minPrice={currentMinPrice}
+            setMinPrice={(val) => updateFilter('minPrice', val)}
+            maxPrice={currentMaxPrice}
+            setMaxPrice={(val) => updateFilter('maxPrice', val)}
+            maxLimit={globalMaxPrice}
+            showFavoritesOnly={false}
+            toggleFavoritesOnly={() => router.push('/favorites')}
+            favoritesCount={favorites.length}
+            onReset={handleReset}
+            categories={categories}
+          />
         </div>
         
         <RecentlyViewed />

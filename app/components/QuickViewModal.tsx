@@ -43,11 +43,26 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
     }
   }, [isOpen, mounted])
 
+    // Handle Escape key
+  React.useEffect(() => {
+    if (!isOpen) return
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isOpen, onClose])
+
   if (!mounted) return null
   if (!isOpen) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quickview-title"
+    >
       <div 
         className="bg-[#121212] border border-white/10 rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden relative animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
@@ -55,8 +70,9 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
         <button 
           onClick={onClose}
           className="absolute top-4 right-4 p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors z-10"
+          aria-label="Bezárás"
         >
-          <X size={20} />
+          <X size={20} aria-hidden="true" />
         </button>
 
         <div className="grid grid-cols-1 md:grid-cols-[420px_1fr] gap-6 p-6">
@@ -77,7 +93,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
               </span>
             </div>
 
-            <h2 className="text-2xl md:text-3xl font-bold mb-2">{product.name}</h2>
+            <h2 id="quickview-title" className="text-2xl md:text-3xl font-bold mb-2">{product.name}</h2>
             
             <div className="flex items-center gap-2 mb-4">
               <div className="flex text-yellow-400">

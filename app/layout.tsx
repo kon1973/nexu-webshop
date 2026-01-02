@@ -7,6 +7,8 @@ import { Toaster } from 'sonner'
 import CartSidebar from './components/CartSidebar'
 import Footer from './components/Footer'
 import ScrollToTop from './components/ScrollToTop'
+import CookieBanner from './components/CookieBanner'
+import SkipToContent from './components/Accessibility'
 import { getSiteUrl } from '@/lib/site'
 import { getSettings, getCategories } from '@/lib/cache'
 
@@ -50,12 +52,38 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="hu" suppressHydrationWarning>
       <body className={`${inter.className} bg-[#0a0a0a] text-white`}>
         <Providers settings={settings}>
+          <SkipToContent />
           <Navbar categories={categories} />
           <CartSidebar />
-          <main>{children}</main>
+          <main id="main-content">{children}</main>
           <Footer settings={settings} />
           <ScrollToTop />
-          <Toaster position="bottom-right" theme="dark" />
+          <Toaster 
+            position="bottom-right" 
+            theme="dark"
+            toastOptions={{
+              style: {
+                background: '#1a1a1a',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '16px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              },
+              classNames: {
+                toast: 'animate-slide-up',
+                title: 'text-white font-semibold',
+                description: 'text-gray-400 text-sm',
+                success: 'border-green-500/20 [&>svg]:text-green-500',
+                error: 'border-red-500/20 [&>svg]:text-red-500',
+                warning: 'border-yellow-500/20 [&>svg]:text-yellow-500',
+                info: 'border-blue-500/20 [&>svg]:text-blue-500',
+              },
+            }}
+            expand
+            richColors
+            closeButton
+          />
+          <CookieBanner />
         </Providers>
       </body>
     </html>

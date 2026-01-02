@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Edit, Plus, Search, Filter, ChevronLeft, ChevronRight, Package } from 'lucide-react'
 import DeleteButton from './DeleteButton'
 import VisibilityToggle from './VisibilityToggle'
@@ -131,9 +132,15 @@ export default function ProductListClient({ products, categories, totalCount, cu
               {products.map((product) => (
                 <tr key={product.id} className="hover:bg-white/5 transition-colors">
                   <td className="p-4">
-                    <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center text-2xl overflow-hidden">
+                    <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center text-2xl overflow-hidden relative">
                       {getImageUrl(product.image) ? (
-                        <img src={getImageUrl(product.image)!} alt="" className="w-full h-full object-cover" />
+                        <Image 
+                          src={getImageUrl(product.image)!} 
+                          alt={product.name} 
+                          fill
+                          sizes="48px"
+                          className="object-cover" 
+                        />
                       ) : product.image === '\u{1f4e6}' ? (
                         product.image
                       ) : (

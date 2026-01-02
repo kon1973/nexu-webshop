@@ -4,7 +4,11 @@ import Link from 'next/link'
 import { ArrowRight, ShieldCheck, Star, Truck, Zap, Package } from 'lucide-react'
 import BannerCarousel from './components/BannerCarousel'
 import ProductCard from './components/ProductCard'
-import { getSettings, getBanners, getCategories, getFeaturedProducts, getNewArrivals } from '@/lib/cache'
+import NewsletterSection from './components/NewsletterSection'
+import BrandMarquee from './components/BrandMarquee'
+import LatestNews from './components/LatestNews'
+import CustomerReviews from './components/CustomerReviews'
+import { getSettings, getBanners, getCategories, getFeaturedProducts, getNewArrivals, getPromoBanner, getLatestBlogPosts, getLatestReviews } from '@/lib/cache'
 import { getImageUrl } from '@/lib/image'
 
 export default async function HomePage() {
@@ -32,9 +36,12 @@ export default async function HomePage() {
   const freeShippingThreshold = settings.free_shipping_threshold ? parseInt(settings.free_shipping_threshold) : 20000
 
   const banners = await getBanners()
+  const promoBanner = await getPromoBanner()
   const categories = await getCategories()
   const featuredProducts = await getFeaturedProducts()
   const newArrivals = await getNewArrivals()
+  const latestPosts = await getLatestBlogPosts()
+  const latestReviews = await getLatestReviews()
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-purple-500/30">
@@ -137,59 +144,114 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="py-16 border-t border-white/5">
+      {/* Features Section */}
+      <section className="py-12 border-y border-white/5 bg-white/[0.02]">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 transition-colors group">
-              <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-xl flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                <Truck size={24} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="flex items-center gap-4 p-6 rounded-2xl bg-[#121212] border border-white/5 hover:border-blue-500/30 transition-all hover:-translate-y-1 group shadow-lg shadow-black/20">
+              <div className="w-14 h-14 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+                <Truck size={28} />
               </div>
               <div>
-                <h3 className="font-bold text-lg">{'Ingyenes sz\u00E1ll\u00EDt\u00E1s'}</h3>
-                <p className="text-sm text-gray-400">
-                  {`Minden ${freeShippingThreshold.toLocaleString('hu-HU')} Ft feletti rendel\u00E9sn\u00E9l.`}
+                <h3 className="font-bold text-lg text-white mb-1">Ingyenes szállítás</h3>
+                <p className="text-sm text-gray-400 leading-tight">
+                  {freeShippingThreshold.toLocaleString('hu-HU')} Ft feletti rendelés esetén
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 transition-colors group">
-              <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center group-hover:bg-purple-500 group-hover:text-white transition-colors">
-                <ShieldCheck size={24} />
+            <div className="flex items-center gap-4 p-6 rounded-2xl bg-[#121212] border border-white/5 hover:border-purple-500/30 transition-all hover:-translate-y-1 group shadow-lg shadow-black/20">
+              <div className="w-14 h-14 bg-purple-500/10 text-purple-400 rounded-2xl flex items-center justify-center group-hover:bg-purple-500 group-hover:text-white transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.15)]">
+                <ShieldCheck size={28} />
               </div>
               <div>
-                <h3 className="font-bold text-lg">{'P\u00E9nzvisszafizet\u00E9s'}</h3>
-                <p className="text-sm text-gray-400">{'30 napos visszav\u00E1s\u00E1rl\u00E1si garancia.'}</p>
+                <h3 className="font-bold text-lg text-white mb-1">Pénzvisszafizetés</h3>
+                <p className="text-sm text-gray-400 leading-tight">
+                  30 napos visszavásárlási garancia
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 transition-colors group">
-              <div className="w-12 h-12 bg-pink-500/10 text-pink-400 rounded-xl flex items-center justify-center group-hover:bg-pink-500 group-hover:text-white transition-colors">
-                <Zap size={24} />
+            <div className="flex items-center gap-4 p-6 rounded-2xl bg-[#121212] border border-white/5 hover:border-pink-500/30 transition-all hover:-translate-y-1 group shadow-lg shadow-black/20">
+              <div className="w-14 h-14 bg-pink-500/10 text-pink-400 rounded-2xl flex items-center justify-center group-hover:bg-pink-500 group-hover:text-white transition-all duration-300 shadow-[0_0_20px_rgba(236,72,153,0.15)]">
+                <Zap size={28} />
               </div>
               <div>
-                <h3 className="font-bold text-lg">{'Gyors kisz\u00E1ll\u00EDt\u00E1s'}</h3>
-                <p className="text-sm text-gray-400">{'Ak\u00E1r m\u00E1r m\u00E1snapra n\u00E1lad lehet.'}</p>
+                <h3 className="font-bold text-lg text-white mb-1">Gyors kiszállítás</h3>
+                <p className="text-sm text-gray-400 leading-tight">
+                  Akár másnapi kézbesítéssel
+                </p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
+      <BrandMarquee />
+
       <section id="categories" className="py-20 bg-[#0f0f0f]">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">Fedezd fel kategóriáinkat</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-6">
+          <div className="flex overflow-x-auto pb-4 gap-4 md:grid md:grid-cols-3 lg:grid-cols-6 md:gap-6 snap-x scrollbar-hide">
             {categories.map((cat: Category) => (
               <Link
                 key={cat.id}
                 href={`/shop?category=${cat.name}`}
-                className="group relative overflow-hidden rounded-2xl aspect-square flex flex-col items-center justify-center bg-[#1a1a1a] border border-white/5 hover:border-white/20 transition-all hover:-translate-y-1"
+                className="min-w-[140px] md:min-w-0 snap-center group relative overflow-hidden rounded-2xl aspect-square flex flex-col items-center justify-center bg-[#1a1a1a] border border-white/5 hover:border-white/20 transition-all hover:-translate-y-1"
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${cat.color || 'from-gray-800 to-gray-900'} opacity-0 group-hover:opacity-20 transition-opacity duration-500`} />
                 <span className="text-4xl mb-4 transform group-hover:scale-110 transition-transform duration-300 relative z-10">{cat.icon || '📦'}</span>
                 <span className="font-bold text-lg relative z-10">{cat.name}</span>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Promotional Banner */}
+      <section className="py-12">
+        <div className="container mx-auto px-4">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-white/10 px-6 py-12 md:px-12 md:py-16 text-center md:text-left">
+            <div className="absolute top-0 right-0 -mt-20 -mr-20 w-96 h-96 bg-purple-500/30 blur-[100px] rounded-full pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-72 h-72 bg-blue-500/30 blur-[80px] rounded-full pointer-events-none"></div>
+            
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div>
+                <div className="inline-block px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-sm font-bold text-white mb-6 backdrop-blur-md">
+                  🔥 {promoBanner ? 'Kiemelt ajánlat' : 'Korlátozott ideig'}
+                </div>
+                <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight">
+                  {promoBanner ? promoBanner.title : 'Gamer Kiegészítők'} <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                    {promoBanner ? '' : 'Prémium Minőségben'}
+                  </span>
+                </h2>
+                <p className="text-gray-300 text-lg mb-8 max-w-md">
+                  {promoBanner?.subtitle || 'Emeld új szintre a játékélményt! Billentyűzetek, egerek és fejhallgatók most bevezető áron.'}
+                </p>
+                <Link 
+                  href={promoBanner?.link || '/shop'} 
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+                >
+                  {promoBanner?.showButton ? 'Megnézem' : 'Megnézem az ajánlatokat'} <ArrowRight size={20} />
+                </Link>
+              </div>
+              <div className="hidden md:flex justify-center items-center">
+                 <div className="relative w-full max-w-md aspect-video rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden group">
+                    {promoBanner?.image ? (
+                      <img src={getImageUrl(promoBanner.image)!} alt={promoBanner.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <>
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 group-hover:opacity-100 transition-opacity duration-500"></div>
+                        <div className="text-center p-8">
+                            <div className="text-6xl mb-4">🎮</div>
+                            <div className="font-bold text-xl text-white">Next Level Gaming</div>
+                        </div>
+                      </>
+                    )}
+                 </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -248,6 +310,10 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <CustomerReviews reviews={latestReviews} />
+      <LatestNews posts={latestPosts} />
+      <NewsletterSection />
     </div>
   )
 }

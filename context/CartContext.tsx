@@ -99,19 +99,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         .then(res => res.json())
         .then(data => {
           if (data.items && Array.isArray(data.items)) {
-            // Strategy: Server wins if local is empty, otherwise merge?
-            // Simple strategy: If server has items, use server items. 
-            // If server is empty but local has items, sync local to server (handled by next effect).
-            // Better: Merge.
-            if (data.items.length > 0) {
-               setCart(prev => {
-                 if (prev.length === 0) return data.items
-                 // Merge logic could go here, but for now let's just use server data to avoid conflicts
-                 // or maybe keep local if it's "fresher"? 
-                 // Let's assume server is the source of truth if it exists.
-                 return data.items
-               })
-            }
+            const serverItems = data.items as CartItem[]
+
+            setCart(prevLocalCart => {
+              // If server has items, use server cart (authoritative source)
+              if (serverItems.length > 0) {
+                return serverItems
+              }
+              
+              // If server is empty but local has items, keep local and sync to server
+              if (prevLocalCart.length > 0) {
+                // Sync local cart to server
+                fetch('/api/cart/sync', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ items: prevLocalCart }),
+                }).catch(console.error)
+                return prevLocalCart
+              }
+
+              // Both empty
+              return []
+            })
           }
         })
         .catch(console.error)

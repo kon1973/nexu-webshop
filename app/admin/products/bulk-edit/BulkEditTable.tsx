@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { toast } from 'sonner'
 import { Save, Loader2, Search, Filter, ChevronRight, ChevronDown, Calculator, Package } from 'lucide-react'
 import { bulkUpdateProductsAction } from '../actions'
@@ -258,9 +259,15 @@ export default function BulkEditTable({ initialProducts, categories }: { initial
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-xl overflow-hidden">
+                          <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-xl overflow-hidden relative">
                             {getImageUrl(product.image) ? (
-                                <img src={getImageUrl(product.image)!} alt="" className="w-full h-full object-cover" />
+                                <Image 
+                                  src={getImageUrl(product.image)!} 
+                                  alt={product.name} 
+                                  fill
+                                  sizes="40px"
+                                  className="object-cover" 
+                                />
                             ) : (
                                 <Package size={20} className="text-gray-500" />
                             )}

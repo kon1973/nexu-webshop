@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
-import { Heart, Menu, ShoppingCart, User, X, LogOut, Search, ChevronDown, LayoutDashboard, Package, ArrowLeftRight } from 'lucide-react'
+import { Heart, ShoppingCart, User, LogOut, Search, ChevronDown, LayoutDashboard, Package, ArrowLeftRight, Menu, X, Home, Grid3X3 } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useFavorites } from '@/context/FavoritesContext'
 import { useCompare } from '@/context/CompareContext'
@@ -38,12 +38,13 @@ type Category = {
 export default function Navbar({ categories = [] }: { categories?: Category[] }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [isOpen, setIsOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
   const searchRef = useRef<HTMLDivElement>(null)
 
   const { itemCount, openCart } = useCart()
@@ -51,7 +52,6 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
   const { compareList } = useCompare()
   const { data: session } = useSession()
 
-  const closeMenu = () => setIsOpen(false)
   const favoriteCount = favorites.length
   const compareCount = compareList.length
 
@@ -64,6 +64,10 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    setActiveIndex(-1)
+  }, [suggestions])
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -98,21 +102,91 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIndex(prev => (prev + 1) % suggestions.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIndex(prev => (prev - 1 + suggestions.length) % suggestions.length)
+    } else if (e.key === 'Enter') {
+      if (activeIndex > -1) {
+        e.preventDefault()
+        const product = suggestions[activeIndex]
+        router.push(`/shop/${product.id}`)
+        setShowSuggestions(false)
+        setSearchQuery('')
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false)
+    }
+  }
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
       <nav
-        className="bg-[#0a0a0a]/80 backdrop-blur-md border-b border-purple-500/20"
+        className="bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-white/10"
         aria-label="Fő navigáció"
       >
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-4 py-3 md:py-4 flex justify-between items-center">
+          {/* Logo */}
           <Link
             href="/"
-            className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600"
-            onClick={closeMenu}
+            className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600"
           >
             NEXU
           </Link>
 
+          {/* Mobile: Right side icons */}
+          <div className="flex md:hidden items-center gap-1">
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2.5 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+              title="Keresés"
+            >
+              <Search size={20} />
+            </button>
+            
+            <Link
+              href="/favorites"
+              className={`relative p-2.5 rounded-full transition-colors ${
+                isActivePath(pathname, '/favorites')
+                  ? 'text-red-400 bg-red-500/10'
+                  : 'text-gray-300 hover:text-red-400'
+              }`}
+            >
+              <Heart size={20} />
+              {favoriteCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                  {favoriteCount}
+                </span>
+              )}
+            </Link>
+
+            <button
+              type="button"
+              onClick={openCart}
+              className="relative p-2.5 rounded-full text-gray-300 hover:text-white transition-colors"
+            >
+              <ShoppingCart size={20} />
+              {itemCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-purple-600 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                  {itemCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-2.5 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition-colors ml-1"
+            >
+              <Menu size={22} />
+            </button>
+          </div>
+
+          {/* Desktop navigation */}
           <div className="hidden md:flex items-center gap-6">
             <Link
               href="/"
@@ -132,18 +206,25 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
             </Link>
 
             <div className="hidden md:flex items-center relative" ref={searchRef}>
-              <form onSubmit={handleSearch} className="relative">
+              <form onSubmit={handleSearch} className="relative" role="search">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
+                  onKeyDown={handleKeyDown}
                   placeholder="Keresés..."
                   className="bg-[#1a1a1a] border border-white/10 rounded-full pl-4 pr-10 py-1.5 text-sm text-white w-64 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={showSuggestions}
+                  aria-controls="search-suggestions"
+                  aria-activedescendant={activeIndex > -1 ? `suggestion-${activeIndex}` : undefined}
                 />
                 <button
                   type="submit"
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                  aria-label="Keresés indítása"
                 >
                   <Search size={16} />
                 </button>
@@ -152,20 +233,27 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
               <AnimatePresence>
                 {showSuggestions && suggestions.length > 0 && (
                   <motion.div
+                    id="search-suggestions"
+                    role="listbox"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50"
                   >
-                    {suggestions.map((product) => (
+                    {suggestions.map((product, index) => (
                       <Link
                         key={product.id}
+                        id={`suggestion-${index}`}
+                        role="option"
+                        aria-selected={index === activeIndex}
                         href={`/shop/${product.id}`}
                         onClick={() => {
                           setShowSuggestions(false)
                           setSearchQuery('')
                         }}
-                        className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                        className={`flex items-center gap-3 p-3 transition-colors border-b border-white/5 last:border-0 ${
+                          index === activeIndex ? 'bg-white/10' : 'hover:bg-white/5'
+                        }`}
                       >
                         <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center text-lg relative overflow-hidden">
                           {getImageUrl(product.image) ? (
@@ -194,39 +282,6 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-
-            <div className="md:hidden">
-              {isSearchOpen ? (
-                <div className="absolute inset-0 bg-[#0a0a0a] z-50 flex items-center px-4 gap-2">
-                  <form onSubmit={handleSearch} className="flex-1 flex items-center bg-[#1a1a1a] border border-white/10 rounded-full px-4 py-2">
-                    <Search size={18} className="text-gray-400 mr-2" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Keresés..."
-                      className="bg-transparent border-none outline-none text-sm text-white w-full placeholder-gray-500"
-                      autoFocus
-                    />
-                  </form>
-                  <button
-                    type="button"
-                    onClick={() => setIsSearchOpen(false)}
-                    className="p-2 text-gray-400 hover:text-white"
-                  >
-                    <span className="text-sm font-medium">Mégse</span>
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setIsSearchOpen(true)}
-                  className="p-2 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
-                  title="Keresés"
-                >
-                  <Search size={20} />
-                </button>
-              )}
             </div>
 
             <Link
@@ -362,131 +417,300 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
               )}
             </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setIsOpen((prev) => !prev)}
-            className="md:hidden text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
-            aria-label={isOpen ? 'Men\u00FC bez\u00E1r\u00E1sa' : 'Men\u00FC megnyit\u00E1sa'}
-            aria-expanded={isOpen}
-            aria-controls="mobile-nav"
-          >
-            {isOpen ? <X /> : <Menu />}
-          </button>
         </div>
       </nav>
 
+      {/* Mobile Search Overlay */}
       <AnimatePresence>
-        {isOpen && (
-          <>
-            <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              type="button"
-              aria-label={'Háttér'}
-              onClick={closeMenu}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm md:hidden -z-10"
-            />
-
-            <motion.div
-              id="mobile-nav"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
-              className="md:hidden absolute left-0 right-0 top-full bg-[#0a0a0a] border-t border-white/10 shadow-2xl overflow-hidden"
-            >
-              <div className="container mx-auto px-4 py-6 flex flex-col gap-5">
-                <Link
-                  href="/"
-                  onClick={closeMenu}
-                  className={`text-base font-semibold ${
-                    isActivePath(pathname, '/') ? 'text-white' : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  {'Kezdőlap'}
-                </Link>
-
-                <Link
-                  href="/shop"
-                  onClick={closeMenu}
-                  className={`text-base font-semibold ${
-                    isActivePath(pathname, '/shop') ? 'text-white' : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  {'Termékek'}
-                </Link>
-
-                <Link
-                  href="/favorites"
-                  onClick={closeMenu}
-                  className={`flex items-center justify-between gap-3 text-base font-semibold ${
-                    isActivePath(pathname, '/favorites') ? 'text-red-400' : 'text-gray-300 hover:text-red-400'
-                  }`}
-                >
-                  <span className="flex items-center gap-3">
-                    <Heart size={20} /> {'Kedvencek'}
-                  </span>
-                  <span className="text-sm text-gray-400">{favoriteCount}</span>
-                </Link>
-
-                {session ? (
-                  <>
-                    {session.user?.role === 'admin' && (
-                      <Link
-                        href="/admin"
-                        onClick={closeMenu}
-                        className={`flex items-center gap-3 text-base font-semibold ${
-                          isActivePath(pathname, '/admin') ? 'text-white' : 'text-gray-300 hover:text-white'
-                        }`}
-                      >
-                        <User size={20} /> Admin
-                      </Link>
-                    )}
-                    <button
-                      onClick={() => {
-                        closeMenu()
-                        signOut()
-                      }}
-                      className="flex items-center gap-3 text-base font-semibold text-gray-300 hover:text-white"
-                    >
-                      <LogOut size={20} /> Kijelentkezés
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    href="/login"
-                    onClick={closeMenu}
-                    className={`flex items-center gap-3 text-base font-semibold ${
-                      isActivePath(pathname, '/login') ? 'text-white' : 'text-gray-300 hover:text-white'
-                    }`}
-                  >
-                    <User size={20} /> Bejelentkezés
-                  </Link>
-                )}
-
-                <hr className="border-white/10" />
-
+        {isSearchOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-[#0a0a0a] z-[100] flex flex-col md:hidden"
+          >
+            <div className="p-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <form onSubmit={handleSearch} className="flex-1 flex items-center bg-[#1a1a1a] border border-white/10 rounded-2xl px-4 py-3">
+                  <Search size={20} className="text-gray-400 mr-3 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Keresés termékek között..."
+                    className="bg-transparent border-none outline-none text-base text-white w-full placeholder-gray-500"
+                    autoFocus
+                  />
+                </form>
                 <button
                   type="button"
                   onClick={() => {
-                    closeMenu()
+                    setIsSearchOpen(false)
+                    setSearchQuery('')
+                    setSuggestions([])
+                  }}
+                  className="p-2 text-gray-400 hover:text-white"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Search Suggestions */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {suggestions.length > 0 ? (
+                <>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Találatok</p>
+                  <div className="space-y-2">
+                    {suggestions.map((product) => (
+                      <Link
+                        key={product.id}
+                        href={`/shop/${product.id}`}
+                        onClick={() => {
+                          setIsSearchOpen(false)
+                          setSearchQuery('')
+                          setSuggestions([])
+                        }}
+                        className="flex items-center gap-4 p-3 bg-[#1a1a1a] rounded-xl border border-white/5 active:bg-white/10"
+                      >
+                        <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center relative overflow-hidden flex-shrink-0">
+                          {getImageUrl(product.image) ? (
+                            <Image src={getImageUrl(product.image)!} alt={product.name} fill className="object-cover" sizes="48px" />
+                          ) : (
+                            <Package size={24} className="text-gray-500" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-white truncate">{product.name}</p>
+                          <p className="text-xs text-gray-400">{product.category}</p>
+                        </div>
+                        <div className="text-sm font-bold text-purple-400">
+                          {product.price.toLocaleString('hu-HU')} Ft
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              ) : searchQuery.length >= 2 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <Search size={48} className="mx-auto mb-4 opacity-30" />
+                  <p>Nincs találat</p>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <Search size={48} className="mx-auto mb-4 opacity-30" />
+                  <p>Kezdj el gépelni a kereséshez</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] md:hidden"
+          >
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="absolute top-0 right-0 bottom-0 w-[85%] max-w-sm bg-[#0a0a0a] border-l border-white/10 flex flex-col"
+            >
+              {/* Menu Header */}
+              <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                <span className="text-lg font-bold text-white">Menü</span>
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* User Info (if logged in) */}
+              {session && (
+                <div className="p-4 border-b border-white/10 bg-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      {session.user?.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate">{session.user?.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{session.user?.email}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Menu Items */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-1">
+                  <Link
+                    href="/"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
+                      isActivePath(pathname, '/') 
+                        ? 'bg-purple-500/20 text-purple-400' 
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Home size={22} />
+                    <span className="font-medium">Kezdőlap</span>
+                  </Link>
+
+                  <Link
+                    href="/shop"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
+                      isActivePath(pathname, '/shop') 
+                        ? 'bg-purple-500/20 text-purple-400' 
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Grid3X3 size={22} />
+                    <span className="font-medium">Termékek</span>
+                  </Link>
+
+                  <Link
+                    href="/compare"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
+                      isActivePath(pathname, '/compare') 
+                        ? 'bg-purple-500/20 text-purple-400' 
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <ArrowLeftRight size={22} />
+                    <span className="font-medium">Összehasonlítás</span>
+                    {compareCount > 0 && (
+                      <span className="ml-auto bg-purple-500/20 text-purple-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                        {compareCount}
+                      </span>
+                    )}
+                  </Link>
+
+                  <Link
+                    href="/favorites"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
+                      isActivePath(pathname, '/favorites') 
+                        ? 'bg-red-500/20 text-red-400' 
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Heart size={22} />
+                    <span className="font-medium">Kedvencek</span>
+                    {favoriteCount > 0 && (
+                      <span className="ml-auto bg-red-500/20 text-red-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                        {favoriteCount}
+                      </span>
+                    )}
+                  </Link>
+
+                  <hr className="my-3 border-white/10" />
+
+                  {session ? (
+                    <>
+                      {session.user?.role === 'admin' && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
+                            isActivePath(pathname, '/admin') 
+                              ? 'bg-purple-500/20 text-purple-400' 
+                              : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                          }`}
+                        >
+                          <LayoutDashboard size={22} />
+                          <span className="font-medium">Admin vezérlőpult</span>
+                        </Link>
+                      )}
+
+                      <Link
+                        href="/profile"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
+                          isActivePath(pathname, '/profile') 
+                            ? 'bg-purple-500/20 text-purple-400' 
+                            : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        <User size={22} />
+                        <span className="font-medium">Profilom</span>
+                      </Link>
+
+                      <Link
+                        href="/profile?tab=orders"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-4 px-4 py-3.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                      >
+                        <Package size={22} />
+                        <span className="font-medium">Rendeléseim</span>
+                      </Link>
+
+                      <button
+                        onClick={() => {
+                          setIsMobileMenuOpen(false)
+                          signOut()
+                        }}
+                        className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <LogOut size={22} />
+                        <span className="font-medium">Kijelentkezés</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/login"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-4 px-4 py-3.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                      >
+                        <User size={22} />
+                        <span className="font-medium">Bejelentkezés</span>
+                      </Link>
+                      <Link
+                        href="/register"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center justify-center gap-2 mx-4 mt-2 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold transition-all hover:shadow-lg hover:shadow-purple-500/30"
+                      >
+                        Regisztráció
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Cart Button at Bottom */}
+              <div className="p-4 border-t border-white/10">
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false)
                     openCart()
                   }}
-                  className="flex items-center justify-between gap-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-3 transition-colors"
+                  className="w-full flex items-center justify-center gap-3 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl shadow-lg shadow-purple-500/30"
                 >
-                  <span className="flex items-center gap-3 text-purple-300 font-bold">
-                    <ShoppingCart size={20} /> {'Kosár'}
-                  </span>
-                  <span className="text-sm text-gray-300">{itemCount} db</span>
+                  <ShoppingCart size={20} />
+                  <span>Kosár megtekintése</span>
+                  {itemCount > 0 && (
+                    <span className="bg-white/20 px-2.5 py-0.5 rounded-full text-sm">
+                      {itemCount}
+                    </span>
+                  )}
                 </button>
               </div>
             </motion.div>
-          </>
+          </motion.div>
         )}
       </AnimatePresence>
     </header>
   )
 }
-
