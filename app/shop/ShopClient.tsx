@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition, useCallback } from 'react'
 import FilterPanel from './FilterPanel'
 import { useFavorites } from '@/context/FavoritesContext'
 import ProductCard from '@/app/components/ProductCard'
 import BannerCarousel from '@/app/components/BannerCarousel'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import type { Product, Banner, Category, Brand } from '@prisma/client'
-import { SearchX, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { SearchX, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import RecentlyViewed from '@/app/components/RecentlyViewed'
 import type { SelectedSpec } from './SpecificationFilters'
 
@@ -42,6 +42,7 @@ export default function ShopClient({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const [isPending, startTransition] = useTransition()
   
   const { favorites } = useFavorites()
 
@@ -53,7 +54,7 @@ export default function ShopClient({
     setSearchTerm(searchParams.get('search') || '')
   }, [searchParams])
 
-  const updateFilter = (key: string, value: string | number | null) => {
+  const updateFilter = useCallback((key: string, value: string | number | null) => {
     const params = new URLSearchParams(searchParams.toString())
     if (value === null || value === '' || value === 0) {
       params.delete(key)
@@ -66,8 +67,11 @@ export default function ShopClient({
       params.delete('page')
     }
 
-    router.push(`${pathname}?${params.toString()}`, { scroll: false })
-  }
+    // Use startTransition for non-blocking navigation
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    })
+  }, [searchParams, pathname, router])
 
   // Debounce search
   useEffect(() => {
@@ -380,28 +384,41 @@ export default function ShopClient({
               </div>
             )}
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6">
-              {products.map((product, index) => (
-                <ProductCard key={product.id} product={product} priority={index < 4} />
-              ))}
-
-              {products.length === 0 && (
-                <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24 text-center bg-[#121212] rounded-2xl md:rounded-3xl border border-white/5 border-dashed">
-                  <div className="w-16 md:w-24 h-16 md:h-24 bg-white/5 rounded-full flex items-center justify-center mb-4 md:mb-6 animate-pulse">
-                    <SearchX size={32} className="md:w-12 md:h-12 text-gray-500" />
+            {/* Product Grid with Loading Overlay */}
+            <div className="relative">
+              {/* Loading overlay */}
+              {isPending && (
+                <div className="absolute inset-0 bg-[#0a0a0a]/60 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
+                  <div className="flex items-center gap-3 bg-[#1a1a1a] px-6 py-4 rounded-xl border border-white/10 shadow-xl">
+                    <Loader2 className="animate-spin text-purple-500" size={24} />
+                    <span className="text-white font-medium">Betöltés...</span>
                   </div>
-                  <h3 className="text-xl md:text-2xl font-bold text-white mb-2 md:mb-3">Nincs találat</h3>
-                  <p className="text-sm md:text-lg text-gray-400 max-w-md mb-6 md:mb-8 px-4">
-                    Sajnos nem találtunk a keresési feltételeknek megfelelő terméket.
-                  </p>
-                  <button
-                    onClick={handleReset}
-                    className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all text-sm md:text-base"
-                  >
-                    <X size={18} /> Szűrők törlése
-                  </button>
                 </div>
               )}
+              
+              <div className={`grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 transition-opacity duration-200 ${isPending ? 'opacity-50' : 'opacity-100'}`}>
+                {products.map((product, index) => (
+                  <ProductCard key={product.id} product={product} priority={index < 4} />
+                ))}
+
+                {products.length === 0 && !isPending && (
+                  <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24 text-center bg-[#121212] rounded-2xl md:rounded-3xl border border-white/5 border-dashed">
+                    <div className="w-16 md:w-24 h-16 md:h-24 bg-white/5 rounded-full flex items-center justify-center mb-4 md:mb-6 animate-pulse">
+                      <SearchX size={32} className="md:w-12 md:h-12 text-gray-500" />
+                    </div>
+                    <h3 className="text-xl md:text-2xl font-bold text-white mb-2 md:mb-3">Nincs találat</h3>
+                    <p className="text-sm md:text-lg text-gray-400 max-w-md mb-6 md:mb-8 px-4">
+                      Sajnos nem találtunk a keresési feltételeknek megfelelő terméket.
+                    </p>
+                    <button
+                      onClick={handleReset}
+                      className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all text-sm md:text-base"
+                    >
+                      <X size={18} /> Szűrők törlése
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Pagination */}

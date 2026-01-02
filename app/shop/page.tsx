@@ -3,11 +3,41 @@ import ShopClient from './ShopClient'
 import type { Metadata } from 'next'
 import { getProductsService } from '@/lib/services/productService'
 import { auth } from '@/lib/auth'
+import { unstable_cache } from 'next/cache'
 
 export const metadata: Metadata = {
   title: 'Termékek',
   description: 'Böngéssz a legújabb tech termékek között a NEXU Store-ban.',
 }
+
+// Cache static data that doesn't change often (5 minutes)
+const getCachedStaticData = unstable_cache(
+  async () => {
+    const [banners, categories, brands, priceAgg] = await Promise.all([
+      prisma.banner.findMany({
+        where: { isActive: true, location: 'SHOP' },
+        orderBy: { order: 'asc' },
+      }),
+      prisma.category.findMany({ orderBy: { name: 'asc' } }),
+      prisma.brand.findMany({ where: { isVisible: true }, orderBy: { order: 'asc' } }),
+      prisma.product.aggregate({ _max: { price: true } })
+    ])
+    return { banners, categories, brands, globalMaxPrice: priceAgg._max.price || 2000000 }
+  },
+  ['shop-static-data'],
+  { revalidate: 300, tags: ['shop-static'] } // 5 minutes cache
+)
+
+// Cache category lookup
+const getCachedCategory = unstable_cache(
+  async (categoryName: string) => {
+    return prisma.category.findFirst({
+      where: { name: categoryName }
+    })
+  },
+  ['shop-category'],
+  { revalidate: 300, tags: ['categories'] }
+)
 
 export default async function ShopPage({
   searchParams,
@@ -51,14 +81,9 @@ export default async function ShopPage({
     ? [...textSpecifications, ...boolSpecifications] 
     : undefined
 
-  let currentCategory = null
-  if (category) {
-    currentCategory = await prisma.category.findFirst({
-      where: { name: category }
-    })
-  }
-
-  const [productsData, banners, categories, brands, priceAgg] = await Promise.all([
+  // Fetch static data from cache and products in parallel
+  const [staticData, productsData, currentCategory] = await Promise.all([
+    getCachedStaticData(),
     getProductsService({
       page,
       limit,
@@ -75,14 +100,10 @@ export default async function ShopPage({
       brandId,
       specifications
     }),
-    prisma.banner.findMany({
-      where: { isActive: true, location: 'SHOP' },
-      orderBy: { order: 'asc' },
-    }),
-    prisma.category.findMany({ orderBy: { name: 'asc' } }),
-    prisma.brand.findMany({ where: { isVisible: true }, orderBy: { order: 'asc' } }),
-    prisma.product.aggregate({ _max: { price: true } })
+    category ? getCachedCategory(category) : Promise.resolve(null)
   ])
+
+  const { banners, categories, brands, globalMaxPrice } = staticData
 
   if (search) {
     const session = await auth()
@@ -94,8 +115,6 @@ export default async function ShopPage({
       }
     }).catch(err => console.error('Search log error:', err))
   }
-
-  const globalMaxPrice = priceAgg._max.price || 2000000
 
   return (
     <ShopClient 
