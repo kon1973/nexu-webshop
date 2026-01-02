@@ -19,7 +19,8 @@ import {
   Image as ImageIcon,
   FileText,
   Sliders,
-  Star
+  Star,
+  ClipboardList
 } from 'lucide-react'
 import { useState } from 'react'
 import { signOut } from 'next-auth/react'
@@ -32,6 +33,7 @@ const menuItems = [
   { name: 'Kuponok', href: '/admin/coupons', icon: TicketPercent },
   { name: 'Értékelések', href: '/admin/reviews', icon: MessageSquare },
   { name: 'Hírlevél', href: '/admin/newsletter', icon: Mail },
+  { name: 'Kimutatások', href: '/admin/reports', icon: ClipboardList },
   { name: 'Analitika', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Blog', href: '/admin/blog', icon: FileText },
   { name: 'Kategóriák', href: '/admin/categories', icon: Tag },

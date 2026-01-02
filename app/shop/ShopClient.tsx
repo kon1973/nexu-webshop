@@ -496,6 +496,19 @@ export default function ShopClient({
             favoritesCount={favorites.length}
             onReset={handleReset}
             categories={categories}
+            inStock={inStock}
+            setInStock={(val) => updateFilter('inStock', val ? 'true' : '')}
+            onSale={onSale}
+            setOnSale={(val) => updateFilter('onSale', val ? 'true' : '')}
+            isNew={isNew}
+            setIsNew={(val) => updateFilter('isNew', val ? 'true' : '')}
+            minRating={minRating}
+            setMinRating={(val) => updateFilter('minRating', val)}
+            brands={brands}
+            selectedBrand={selectedBrand}
+            setSelectedBrand={(val) => updateFilter('brand', val)}
+            selectedSpecs={selectedSpecs}
+            setSelectedSpecs={updateSpecs}
           />
         </div>
         

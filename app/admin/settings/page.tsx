@@ -11,7 +11,8 @@ import {
   Share2, 
   Code,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Target
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -20,7 +21,7 @@ type Setting = {
   value: string
 }
 
-type Tab = 'general' | 'shop' | 'contact' | 'social' | 'integrations' | 'rateLimits'
+type Tab = 'general' | 'shop' | 'contact' | 'social' | 'integrations' | 'kpiGoals' | 'rateLimits'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({})
@@ -82,6 +83,7 @@ export default function SettingsPage() {
     { id: 'contact', label: 'Kapcsolat', icon: Phone },
     { id: 'social', label: 'Közösségi', icon: Share2 },
     { id: 'integrations', label: 'Integrációk', icon: Code },
+    { id: 'kpiGoals', label: 'KPI Célok', icon: Target },
     { id: 'rateLimits', label: 'Rate limit', icon: ToggleLeft },
   ]
 
@@ -353,6 +355,146 @@ export default function SettingsPage() {
                       STRIPE_WEBHOOK_SECRET=...
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* KPI Goals Settings */}
+            {activeTab === 'kpiGoals' && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <h2 className="text-xl font-bold mb-6 pb-4 border-b border-white/5">KPI Célok Beállítása</h2>
+                <p className="text-gray-400 text-sm mb-6">
+                  Állítsd be a napi, heti és havi teljesítménymutatókat. Ezek a célok jelennek meg a Dashboard-on.
+                </p>
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Daily Goals */}
+                  <div className="p-5 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 rounded-xl">
+                    <h3 className="text-emerald-400 font-bold mb-4 flex items-center gap-2">
+                      <Target size={18} />
+                      Napi Célok
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Napi Bevétel Cél (HUF)</label>
+                        <input
+                          type="number"
+                          value={settings.kpi_daily_revenue || '100000'}
+                          onChange={(e) => handleChange('kpi_daily_revenue', e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus:border-emerald-500 outline-none transition-colors"
+                          placeholder="100000"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Napi Rendelések Száma</label>
+                        <input
+                          type="number"
+                          value={settings.kpi_daily_orders || '10'}
+                          onChange={(e) => handleChange('kpi_daily_orders', e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus:border-emerald-500 outline-none transition-colors"
+                          placeholder="10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Weekly Goals */}
+                  <div className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-xl">
+                    <h3 className="text-blue-400 font-bold mb-4 flex items-center gap-2">
+                      <Target size={18} />
+                      Heti Célok
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Heti Bevétel Cél (HUF)</label>
+                        <input
+                          type="number"
+                          value={settings.kpi_weekly_revenue || '500000'}
+                          onChange={(e) => handleChange('kpi_weekly_revenue', e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus:border-blue-500 outline-none transition-colors"
+                          placeholder="500000"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Heti Rendelések Száma</label>
+                        <input
+                          type="number"
+                          value={settings.kpi_weekly_orders || '50'}
+                          onChange={(e) => handleChange('kpi_weekly_orders', e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus:border-blue-500 outline-none transition-colors"
+                          placeholder="50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Monthly Goals */}
+                  <div className="p-5 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 rounded-xl">
+                    <h3 className="text-purple-400 font-bold mb-4 flex items-center gap-2">
+                      <Target size={18} />
+                      Havi Célok
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Havi Bevétel Cél (HUF)</label>
+                        <input
+                          type="number"
+                          value={settings.kpi_monthly_revenue || '2000000'}
+                          onChange={(e) => handleChange('kpi_monthly_revenue', e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus:border-purple-500 outline-none transition-colors"
+                          placeholder="2000000"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Havi Rendelések Száma</label>
+                        <input
+                          type="number"
+                          value={settings.kpi_monthly_orders || '200'}
+                          onChange={(e) => handleChange('kpi_monthly_orders', e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus:border-purple-500 outline-none transition-colors"
+                          placeholder="200"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Other KPIs */}
+                  <div className="p-5 bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/20 rounded-xl">
+                    <h3 className="text-amber-400 font-bold mb-4 flex items-center gap-2">
+                      <Target size={18} />
+                      Egyéb Mutatók
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Átlagos Kosárérték Cél (HUF)</label>
+                        <input
+                          type="number"
+                          value={settings.kpi_avg_order_value || '30000'}
+                          onChange={(e) => handleChange('kpi_avg_order_value', e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus:border-amber-500 outline-none transition-colors"
+                          placeholder="30000"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Konverziós Ráta Cél (%)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={settings.kpi_conversion_rate || '3.0'}
+                          onChange={(e) => handleChange('kpi_conversion_rate', e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus:border-amber-500 outline-none transition-colors"
+                          placeholder="3.0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10">
+                  <p className="text-sm text-gray-400">
+                    💡 <strong className="text-white">Tipp:</strong> A KPI célok a Dashboard "Mai nap" és "KPI Célok" szekcióban jelennek meg progress bar-okkal.
+                    Ha egy célt elérsz, zöld színnel jelenik meg.
+                  </p>
                 </div>
               </div>
             )}

@@ -18,6 +18,26 @@ function getPreviousPeriod(days: number) {
   return { start, end }
 }
 
+// Helper to get today's date range
+function getTodayRange() {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const end = new Date()
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
+// Helper to get yesterday's date range
+function getYesterdayRange() {
+  const start = new Date()
+  start.setDate(start.getDate() - 1)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date()
+  end.setDate(end.getDate() - 1)
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
 export default async function AdminPage() {
   // Date ranges for different periods
   const periods = {
@@ -32,6 +52,64 @@ export default async function AdminPage() {
     month: getPreviousPeriod(30),
     quarter: getPreviousPeriod(90),
     year: getPreviousPeriod(365)
+  }
+
+  const todayRange = getTodayRange()
+  const yesterdayRange = getYesterdayRange()
+
+  // Today's stats
+  const [todayRevenue, yesterdayRevenue, todayOrders, todayUsers] = await Promise.all([
+    prisma.order.aggregate({
+      where: { 
+        status: { not: 'cancelled' }, 
+        createdAt: { gte: todayRange.start, lte: todayRange.end } 
+      },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    }),
+    prisma.order.aggregate({
+      where: { 
+        status: { not: 'cancelled' }, 
+        createdAt: { gte: yesterdayRange.start, lte: yesterdayRange.end } 
+      },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    }),
+    prisma.order.findMany({
+      where: { createdAt: { gte: todayRange.start, lte: todayRange.end } },
+      select: { 
+        id: true, 
+        customerName: true, 
+        totalPrice: true, 
+        status: true, 
+        createdAt: true,
+        paymentMethod: true 
+      },
+      orderBy: { createdAt: 'desc' }
+    }),
+    prisma.user.count({
+      where: { createdAt: { gte: todayRange.start, lte: todayRange.end } }
+    })
+  ])
+
+  const todaySummary = {
+    revenue: todayRevenue._sum.totalPrice || 0,
+    orders: todayRevenue._count.id,
+    users: todayUsers,
+    avgOrderValue: todayRevenue._count.id > 0 
+      ? Math.round((todayRevenue._sum.totalPrice || 0) / todayRevenue._count.id) 
+      : 0,
+    revenueChange: yesterdayRevenue._sum.totalPrice 
+      ? Math.round(((todayRevenue._sum.totalPrice || 0) - (yesterdayRevenue._sum.totalPrice || 0)) / (yesterdayRevenue._sum.totalPrice || 1) * 100)
+      : 0,
+    todayOrders: todayOrders.map(o => ({
+      id: o.id,
+      customerName: o.customerName,
+      totalPrice: o.totalPrice,
+      status: o.status,
+      paymentMethod: o.paymentMethod,
+      createdAt: o.createdAt.toISOString()
+    }))
   }
 
   // 1. Total Revenue & Orders (all time)
@@ -402,6 +480,43 @@ export default async function AdminPage() {
     }))
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
+  // 21. KPI Goals - read from database settings
+  const kpiSettings = await prisma.setting.findMany({
+    where: { key: { startsWith: 'kpi_' } }
+  })
+  const kpiMap = kpiSettings.reduce((acc, s) => {
+    acc[s.key] = parseFloat(s.value) || 0
+    return acc
+  }, {} as Record<string, number>)
+
+  const kpiGoals = {
+    dailyRevenue: kpiMap.kpi_daily_revenue || 100000,
+    dailyOrders: kpiMap.kpi_daily_orders || 10,
+    weeklyRevenue: kpiMap.kpi_weekly_revenue || 500000,
+    weeklyOrders: kpiMap.kpi_weekly_orders || 50,
+    monthlyRevenue: kpiMap.kpi_monthly_revenue || 2000000,
+    monthlyOrders: kpiMap.kpi_monthly_orders || 200,
+    conversionRate: kpiMap.kpi_conversion_rate || 3.0,
+    avgOrderValue: kpiMap.kpi_avg_order_value || 30000
+  }
+
+  // 22. Payment method breakdown
+  const paymentMethodBreakdown = await prisma.order.groupBy({
+    by: ['paymentMethod'],
+    where: { 
+      status: { not: 'cancelled' },
+      createdAt: { gte: periods.month.start }
+    },
+    _count: { id: true },
+    _sum: { totalPrice: true }
+  })
+
+  const paymentMethods = paymentMethodBreakdown.map(pm => ({
+    method: pm.paymentMethod || 'unknown',
+    count: pm._count.id,
+    revenue: pm._sum.totalPrice || 0
+  }))
+
   return (
     <AdminDashboardClient
       stats={{
@@ -415,6 +530,9 @@ export default async function AdminPage() {
         ordersChange: revenueByPeriod.month.ordersChange,
         usersChange: usersByPeriod.week.change
       }}
+      todaySummary={todaySummary}
+      kpiGoals={kpiGoals}
+      paymentMethods={paymentMethods}
       revenueByPeriod={revenueByPeriod}
       usersByPeriod={usersByPeriod}
       avgOrderByPeriod={avgOrderByPeriod}

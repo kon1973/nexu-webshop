@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useEffect, useTransition, type FormEvent } from 'react'
-import { ArrowLeft, CheckCircle, CreditCard, Loader2, Truck, MapPin, Banknote, UserPlus, Package, Shield, Clock, Gift, AlertTriangle, Star } from 'lucide-react'
+import { ArrowLeft, CheckCircle, CreditCard, Loader2, Truck, MapPin, Banknote, UserPlus, Package, Shield, Clock, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCart } from '@/context/CartContext'
@@ -984,7 +984,7 @@ export default function CheckoutPage() {
 
               {/* Trust badges */}
               <div className="mt-6 pt-6 border-t border-white/10">
-                <div className="grid grid-cols-2 gap-4 text-xs text-gray-400">
+                <div className="flex items-center justify-center gap-8 text-xs text-gray-400">
                   <div className="flex items-center gap-2">
                     <Shield className="text-green-400" size={16} />
                     <span>Biztonságos fizetés</span>
@@ -992,14 +992,6 @@ export default function CheckoutPage() {
                   <div className="flex items-center gap-2">
                     <Truck className="text-blue-400" size={16} />
                     <span>Gyors kiszállítás</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Gift className="text-purple-400" size={16} />
-                    <span>Ajándék csomagolás</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Star className="text-yellow-400" size={16} />
-                    <span>100% elégedettség</span>
                   </div>
                 </div>
               </div>

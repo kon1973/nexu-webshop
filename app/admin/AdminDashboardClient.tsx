@@ -25,7 +25,11 @@ import {
   Target,
   Eye,
   ShoppingBag,
-  Filter
+  Filter,
+  Sun,
+  CreditCard,
+  Banknote,
+  CheckCircle2
 } from 'lucide-react'
 import { StatCard, QuickActionCard, AlertBanner } from './components/DashboardWidgets'
 import { AreaChart, BarChart, DonutChart, ProgressRing, ComparisonChart } from './components/Charts'
@@ -48,6 +52,36 @@ interface DashboardProps {
     ordersChange: number
     usersChange: number
   }
+  todaySummary: {
+    revenue: number
+    orders: number
+    users: number
+    avgOrderValue: number
+    revenueChange: number
+    todayOrders: Array<{
+      id: string
+      customerName: string
+      totalPrice: number
+      status: string
+      paymentMethod: string | null
+      createdAt: string
+    }>
+  }
+  kpiGoals: {
+    dailyRevenue: number
+    dailyOrders: number
+    weeklyRevenue: number
+    weeklyOrders: number
+    monthlyRevenue: number
+    monthlyOrders: number
+    conversionRate: number
+    avgOrderValue: number
+  }
+  paymentMethods: Array<{
+    method: string
+    count: number
+    revenue: number
+  }>
   revenueByPeriod: {
     week: { revenue: number; orders: number; change: number; ordersChange: number }
     month: { revenue: number; orders: number; change: number; ordersChange: number }
@@ -132,6 +166,9 @@ function formatRelativeTime(date: string) {
 
 export default function AdminDashboardClient({
   stats,
+  todaySummary,
+  kpiGoals,
+  paymentMethods,
   revenueByPeriod,
   usersByPeriod,
   avgOrderByPeriod,
@@ -282,6 +319,225 @@ export default function AdminDashboardClient({
               {periodLabels[period]}
             </button>
           ))}
+        </div>
+
+        {/* Today's Summary - NEW SECTION */}
+        <div className="mb-8 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-pink-600/20 rounded-2xl border border-purple-500/30 p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-yellow-500/20 rounded-xl">
+              <Sun className="text-yellow-400" size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Mai nap összefoglaló</h2>
+              <p className="text-xs text-gray-400">{new Date().toLocaleDateString('hu-HU', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+            </div>
+            {todaySummary.revenueChange !== 0 && (
+              <div className={`ml-auto flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${
+                todaySummary.revenueChange > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+              }`}>
+                {todaySummary.revenueChange > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                {todaySummary.revenueChange > 0 ? '+' : ''}{todaySummary.revenueChange}% vs tegnap
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-black/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign size={16} className="text-green-400" />
+                <span className="text-xs text-gray-400">Mai bevétel</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{todaySummary.revenue.toLocaleString('hu-HU')} Ft</p>
+              <div className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all"
+                  style={{ width: `${Math.min((todaySummary.revenue / kpiGoals.dailyRevenue) * 100, 100)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Cél: {kpiGoals.dailyRevenue.toLocaleString('hu-HU')} Ft ({Math.round((todaySummary.revenue / kpiGoals.dailyRevenue) * 100)}%)
+              </p>
+            </div>
+
+            <div className="bg-black/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ShoppingCart size={16} className="text-blue-400" />
+                <span className="text-xs text-gray-400">Mai rendelések</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{todaySummary.orders} db</p>
+              <div className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all"
+                  style={{ width: `${Math.min((todaySummary.orders / kpiGoals.dailyOrders) * 100, 100)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Cél: {kpiGoals.dailyOrders} db ({Math.round((todaySummary.orders / kpiGoals.dailyOrders) * 100)}%)
+              </p>
+            </div>
+
+            <div className="bg-black/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ShoppingBag size={16} className="text-purple-400" />
+                <span className="text-xs text-gray-400">Átl. kosárérték</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{todaySummary.avgOrderValue.toLocaleString('hu-HU')} Ft</p>
+              <div className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-500 to-pink-400 rounded-full transition-all"
+                  style={{ width: `${Math.min((todaySummary.avgOrderValue / kpiGoals.avgOrderValue) * 100, 100)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Cél: {kpiGoals.avgOrderValue.toLocaleString('hu-HU')} Ft
+              </p>
+            </div>
+
+            <div className="bg-black/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Users size={16} className="text-yellow-400" />
+                <span className="text-xs text-gray-400">Mai regisztrációk</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{todaySummary.users}</p>
+              <p className="text-xs text-gray-500 mt-2">
+                {todaySummary.users > 0 ? '🎉 Új felhasználók!' : 'Még nem regisztrált senki'}
+              </p>
+            </div>
+          </div>
+
+          {/* Today's Orders List */}
+          {todaySummary.todayOrders.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-gray-300 mb-3">Mai rendelések ({todaySummary.todayOrders.length})</h3>
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {todaySummary.todayOrders.slice(0, 6).map((order) => (
+                  <Link
+                    key={order.id}
+                    href={`/admin/orders/${order.id}`}
+                    className="flex-shrink-0 bg-black/40 hover:bg-black/60 rounded-xl p-3 min-w-[180px] transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-[10px] text-gray-500">#{order.id.slice(-6).toUpperCase()}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        order.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                        order.status === 'paid' ? 'bg-blue-500/20 text-blue-400' :
+                        order.status === 'shipped' ? 'bg-purple-500/20 text-purple-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {statusLabels[order.status] || order.status}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-white truncate">{order.customerName}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-purple-400 font-bold">{order.totalPrice.toLocaleString('hu-HU')} Ft</span>
+                      <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                        {order.paymentMethod === 'stripe' ? <CreditCard size={10} /> : <Banknote size={10} />}
+                        {order.paymentMethod === 'stripe' ? 'Kártya' : 'Utánvét'}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* KPI Goals Progress - NEW SECTION */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-[#121212] p-5 rounded-2xl border border-white/5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-300 flex items-center gap-2">
+                <Target size={16} className="text-green-400" />
+                Heti cél
+              </h3>
+              {revenueByPeriod.week.revenue >= kpiGoals.weeklyRevenue && (
+                <CheckCircle2 size={18} className="text-green-400" />
+              )}
+            </div>
+            <div className="flex items-end gap-2 mb-2">
+              <span className="text-2xl font-bold text-white">
+                {revenueByPeriod.week.revenue.toLocaleString('hu-HU')} Ft
+              </span>
+              <span className="text-xs text-gray-500 mb-1">/ {kpiGoals.weeklyRevenue.toLocaleString('hu-HU')} Ft</span>
+            </div>
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all ${
+                  revenueByPeriod.week.revenue >= kpiGoals.weeklyRevenue 
+                    ? 'bg-green-500' 
+                    : 'bg-gradient-to-r from-blue-500 to-purple-500'
+                }`}
+                style={{ width: `${Math.min((revenueByPeriod.week.revenue / kpiGoals.weeklyRevenue) * 100, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {Math.round((revenueByPeriod.week.revenue / kpiGoals.weeklyRevenue) * 100)}% teljesítve
+            </p>
+          </div>
+
+          <div className="bg-[#121212] p-5 rounded-2xl border border-white/5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-300 flex items-center gap-2">
+                <Target size={16} className="text-purple-400" />
+                Havi cél
+              </h3>
+              {revenueByPeriod.month.revenue >= kpiGoals.monthlyRevenue && (
+                <CheckCircle2 size={18} className="text-green-400" />
+              )}
+            </div>
+            <div className="flex items-end gap-2 mb-2">
+              <span className="text-2xl font-bold text-white">
+                {revenueByPeriod.month.revenue.toLocaleString('hu-HU')} Ft
+              </span>
+              <span className="text-xs text-gray-500 mb-1">/ {kpiGoals.monthlyRevenue.toLocaleString('hu-HU')} Ft</span>
+            </div>
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all ${
+                  revenueByPeriod.month.revenue >= kpiGoals.monthlyRevenue 
+                    ? 'bg-green-500' 
+                    : 'bg-gradient-to-r from-purple-500 to-pink-500'
+                }`}
+                style={{ width: `${Math.min((revenueByPeriod.month.revenue / kpiGoals.monthlyRevenue) * 100, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {Math.round((revenueByPeriod.month.revenue / kpiGoals.monthlyRevenue) * 100)}% teljesítve
+            </p>
+          </div>
+
+          <div className="bg-[#121212] p-5 rounded-2xl border border-white/5">
+            <h3 className="text-sm font-bold text-gray-300 flex items-center gap-2 mb-4">
+              <CreditCard size={16} className="text-blue-400" />
+              Fizetési módok (30 nap)
+            </h3>
+            <div className="space-y-2">
+              {paymentMethods.map((pm) => {
+                const totalPayments = paymentMethods.reduce((sum, p) => sum + p.count, 0)
+                const percentage = totalPayments > 0 ? Math.round((pm.count / totalPayments) * 100) : 0
+                return (
+                  <div key={pm.method} className="flex items-center gap-3">
+                    <div className="p-1.5 rounded-lg bg-white/5">
+                      {pm.method === 'stripe' ? <CreditCard size={12} className="text-blue-400" /> : <Banknote size={12} className="text-green-400" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-400">{pm.method === 'stripe' ? 'Bankkártya' : 'Utánvét'}</span>
+                        <span className="text-white font-bold">{percentage}%</span>
+                      </div>
+                      <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full ${pm.method === 'stripe' ? 'bg-blue-500' : 'bg-green-500'}`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-500">{pm.count} db</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Alert banner */}
