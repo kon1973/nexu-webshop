@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, Filter, X, Star, Zap, Package, Sparkles, Check } from 'lucide-react'
+import { Search, Filter, X, Star, Zap, Package, Sparkles, Check, Tag } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 type Props = {
@@ -29,6 +29,10 @@ type Props = {
   setMinRating?: (value: number) => void
   isNew?: boolean
   setIsNew?: (value: boolean) => void
+  // Brand filter
+  brands?: { id: string; name: string; logo?: string | null }[]
+  selectedBrand?: string
+  setSelectedBrand?: (value: string) => void
 }
 
 export default function FilterPanel({
@@ -56,6 +60,9 @@ export default function FilterPanel({
   setMinRating,
   isNew,
   setIsNew,
+  brands = [],
+  selectedBrand,
+  setSelectedBrand,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   
@@ -70,6 +77,7 @@ export default function FilterPanel({
     onSale,
     minRating && minRating > 0,
     isNew,
+    selectedBrand,
   ].filter(Boolean).length
 
 
@@ -113,7 +121,7 @@ export default function FilterPanel({
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto p-5 pb-24">
               <FilterContent 
-                {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew }} 
+                {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands, selectedBrand, setSelectedBrand }} 
               />
             </div>
             
@@ -133,7 +141,7 @@ export default function FilterPanel({
       {/* Desktop Filter Panel */}
       <div className="hidden lg:block bg-[#121212] p-6 rounded-3xl border border-white/5 space-y-8 shadow-xl sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
         <FilterContent 
-          {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew }} 
+          {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands, selectedBrand, setSelectedBrand }} 
         />
       </div>
     </>
@@ -165,10 +173,13 @@ type FilterContentProps = {
   setMinRating?: (value: number) => void
   isNew?: boolean
   setIsNew?: (value: boolean) => void
+  brands?: { id: string; name: string; logo?: string | null }[]
+  selectedBrand?: string
+  setSelectedBrand?: (value: string) => void
 }
 
 function FilterContent({
-  searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew
+  searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands = [], selectedBrand, setSelectedBrand
 }: FilterContentProps) {
   return (
     <div className="space-y-8">
@@ -262,6 +273,50 @@ function FilterContent({
           ))}
         </div>
       </div>
+
+      {/* Brand Filter */}
+      {brands.length > 0 && setSelectedBrand && (
+        <div>
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Tag size={14} /> Márka
+          </h3>
+          <div className="space-y-1 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+            <button
+              type="button"
+              onClick={() => setSelectedBrand('')}
+              className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center justify-between group ${
+                !selectedBrand
+                  ? 'bg-blue-600 text-white font-bold shadow-lg shadow-blue-500/20'
+                  : 'text-gray-400 hover:bg-[#0a0a0a] hover:text-white'
+              }`}
+            >
+              <span>Összes márka</span>
+              {!selectedBrand && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+            </button>
+
+            {brands.map((brand) => (
+              <button
+                key={brand.id}
+                type="button"
+                onClick={() => setSelectedBrand(brand.id)}
+                className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center justify-between group ${
+                  selectedBrand === brand.id
+                    ? 'bg-blue-600 text-white font-bold shadow-lg shadow-blue-500/20'
+                    : 'text-gray-400 hover:bg-[#0a0a0a] hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {brand.logo && (
+                    <img src={brand.logo} alt={brand.name} className="w-5 h-5 object-contain rounded" />
+                  )}
+                  <span>{brand.name}</span>
+                </div>
+                {selectedBrand === brand.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Ársáv</h3>

@@ -6,7 +6,7 @@ import { useFavorites } from '@/context/FavoritesContext'
 import ProductCard from '@/app/components/ProductCard'
 import BannerCarousel from '@/app/components/BannerCarousel'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import type { Product, Banner, Category } from '@prisma/client'
+import type { Product, Banner, Category, Brand } from '@prisma/client'
 import { SearchX, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import RecentlyViewed from '@/app/components/RecentlyViewed'
 
@@ -22,6 +22,7 @@ type Props = {
   currentPage: number
   totalPages: number
   categories: Category[]
+  brands: Brand[]
   globalMaxPrice: number
   currentCategory?: Category | null
 }
@@ -33,6 +34,7 @@ export default function ShopClient({
   currentPage, 
   totalPages,
   categories,
+  brands,
   globalMaxPrice,
   currentCategory
 }: Props) {
@@ -100,6 +102,7 @@ export default function ShopClient({
   const onSale = searchParams.get('onSale') === 'true'
   const isNew = searchParams.get('isNew') === 'true'
   const minRating = Number(searchParams.get('minRating')) || 0
+  const selectedBrand = searchParams.get('brand') || ''
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-purple-500/30">
@@ -175,6 +178,9 @@ export default function ShopClient({
                 setIsNew={(val) => updateFilter('isNew', val ? 'true' : '')}
                 minRating={minRating}
                 setMinRating={(val) => updateFilter('minRating', val)}
+                brands={brands}
+                selectedBrand={selectedBrand}
+                setSelectedBrand={(val) => updateFilter('brand', val)}
               />
             </div>
           </aside>
@@ -191,12 +197,20 @@ export default function ShopClient({
             </div>
 
             {/* Active filters on mobile */}
-            {(selectedCategorySlug || searchTerm || currentMinPrice > 0 || currentMaxPrice < globalMaxPrice || inStock || onSale || isNew || minRating > 0) && (
+            {(selectedCategorySlug || searchTerm || currentMinPrice > 0 || currentMaxPrice < globalMaxPrice || inStock || onSale || isNew || minRating > 0 || selectedBrand) && (
               <div className="flex flex-wrap gap-2 mb-4 lg:hidden">
                 {selectedCategorySlug && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full">
                     {selectedCategorySlug}
                     <button onClick={() => updateFilter('category', '')} className="hover:text-white">
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {selectedBrand && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full">
+                    {brands.find(b => b.id === selectedBrand)?.name || 'Márka'}
+                    <button onClick={() => updateFilter('brand', '')} className="hover:text-white">
                       <X size={12} />
                     </button>
                   </span>

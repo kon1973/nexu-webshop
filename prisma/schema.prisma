@@ -113,6 +113,9 @@ model Product {
   fullDescription String?
   specifications Json?
   isArchived Boolean  @default(false)
+  
+  brandId     String?
+  brand       Brand?   @relation(fields: [brandId], references: [id])
 
   options    ProductOption[]
   variants   ProductVariant[]
@@ -130,6 +133,7 @@ model Product {
   @@index([rating])
   @@index([createdAt])
   @@index([name])
+  @@index([brandId])
 }
 
 model SpecificationTemplate {
@@ -386,6 +390,7 @@ model Brand {
   logo        String?  // URL to logo image
   isVisible   Boolean  @default(true)
   order       Int      @default(0)
+  products    Product[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

@@ -27,6 +27,7 @@ export default async function ShopPage({
   const onSale = params.onSale === 'true'
   const isNew = params.isNew === 'true'
   const minRating = params.minRating ? Number(params.minRating) : undefined
+  const brandId = typeof params.brand === 'string' ? params.brand : undefined
 
   let currentCategory = null
   if (category) {
@@ -35,7 +36,7 @@ export default async function ShopPage({
     })
   }
 
-  const [productsData, banners, categories, priceAgg] = await Promise.all([
+  const [productsData, banners, categories, brands, priceAgg] = await Promise.all([
     getProductsService({
       page,
       limit,
@@ -48,13 +49,15 @@ export default async function ShopPage({
       inStock,
       onSale,
       isNew,
-      minRating
+      minRating,
+      brandId
     }),
     prisma.banner.findMany({
       where: { isActive: true, location: 'SHOP' },
       orderBy: { order: 'asc' },
     }),
     prisma.category.findMany({ orderBy: { name: 'asc' } }),
+    prisma.brand.findMany({ where: { isVisible: true }, orderBy: { order: 'asc' } }),
     prisma.product.aggregate({ _max: { price: true } })
   ])
 
@@ -79,6 +82,7 @@ export default async function ShopPage({
       currentPage={page}
       totalPages={productsData.totalPages}
       categories={categories}
+      brands={brands}
       globalMaxPrice={globalMaxPrice}
       currentCategory={currentCategory}
     />

@@ -38,10 +38,11 @@ export type GetProductsParams = {
   onSale?: boolean
   isNew?: boolean
   minRating?: number
+  brandId?: string
 }
 
 export async function getProductsService(params: GetProductsParams) {
-  const { page = 1, limit = 20, search, category, stock, sort, minPrice, maxPrice, isArchived, inStock, onSale, isNew, minRating } = params
+  const { page = 1, limit = 20, search, category, stock, sort, minPrice, maxPrice, isArchived, inStock, onSale, isNew, minRating, brandId } = params
   const skip = (page - 1) * limit
 
   const searchTerms = search ? search.trim().split(/\s+/).filter(t => t.length > 0) : []
@@ -80,6 +81,7 @@ export async function getProductsService(params: GetProductsParams) {
       } : {},
       isNew ? { createdAt: { gte: thirtyDaysAgo } } : {},
       minRating ? { rating: { gte: minRating } } : {},
+      brandId ? { brandId } : {},
     ],
   }
 
