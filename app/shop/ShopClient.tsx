@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition, useCallback } from 'react'
+import { useState, useEffect, useTransition, useCallback, useMemo, memo } from 'react'
 import FilterPanel from './FilterPanel'
 import { useFavorites } from '@/context/FavoritesContext'
 import ProductCard from '@/app/components/ProductCard'

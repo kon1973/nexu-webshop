@@ -9,7 +9,7 @@ import FavoriteButton from './FavoriteButton'
 import QuickViewModal from './QuickViewModal'
 import type { Product } from '@prisma/client'
 import { toast } from 'sonner'
-import { useState } from 'react'
+import { useState, useMemo, useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { getImageUrl } from '@/lib/image'
 
@@ -21,36 +21,50 @@ interface ProductCardProps {
   priority?: boolean
 }
 
-export default function ProductCard({ product, priority = false }: ProductCardProps) {
+const ProductCard = memo(function ProductCard({ product, priority = false }: ProductCardProps) {
   const { addToCart, openCart } = useCart()
   const { addToCompare, removeFromCompare, isInCompare } = useCompare()
   const router = useRouter()
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false)
-  const isOutOfStock = product.stock <= 0
-  const availabilityLabel = isOutOfStock ? 'Elfogyott' : 'Készleten'
-  const isNew = new Date(product.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000
-  const hasVariants = product.variants && product.variants.length > 0
-  const isCompared = isInCompare(product.id)
-  const reviewsCount = product._count?.reviews || 0
-
-  const now = new Date()
-  const isOnSale = product.salePrice && 
-    (!product.saleStartDate || new Date(product.saleStartDate) <= now) && 
-    (!product.saleEndDate || new Date(product.saleEndDate) >= now)
   
-  const currentPrice = isOnSale ? product.salePrice : product.price
-  
-  // Calculate discount percentage
-  let discountPercentage = 0
-  if (isOnSale && product.salePrice) {
-    if (product.salePercentage) {
-      discountPercentage = product.salePercentage
-    } else {
-      discountPercentage = Math.round(((product.price - product.salePrice) / product.price) * 100)
+  // Memoize computed values
+  const { isOutOfStock, isNew, hasVariants, reviewsCount, isOnSale, currentPrice, discountPercentage, imageUrl } = useMemo(() => {
+    const outOfStock = product.stock <= 0
+    const productIsNew = new Date(product.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000
+    const variants = product.variants && product.variants.length > 0
+    const reviews = product._count?.reviews || 0
+    
+    const now = new Date()
+    const onSale = product.salePrice && 
+      (!product.saleStartDate || new Date(product.saleStartDate) <= now) && 
+      (!product.saleEndDate || new Date(product.saleEndDate) >= now)
+    
+    const price = onSale ? product.salePrice : product.price
+    
+    let discount = 0
+    if (onSale && product.salePrice) {
+      if (product.salePercentage) {
+        discount = product.salePercentage
+      } else {
+        discount = Math.round(((product.price - product.salePrice) / product.price) * 100)
+      }
     }
-  }
+    
+    return {
+      isOutOfStock: outOfStock,
+      isNew: productIsNew,
+      hasVariants: variants,
+      reviewsCount: reviews,
+      isOnSale: onSale,
+      currentPrice: price,
+      discountPercentage: discount,
+      imageUrl: getImageUrl(product.image)
+    }
+  }, [product])
+  
+  const isCompared = isInCompare(product.id)
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     
@@ -67,15 +81,15 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     })
     openCart()
     toast.success(`${product.name} a kosárba került`)
-  }
+  }, [hasVariants, isOutOfStock, isOnSale, currentPrice, product, router, addToCart, openCart])
 
-  const handleQuickView = (e: React.MouseEvent) => {
+  const handleQuickView = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setIsQuickViewOpen(true)
-  }
+  }, [])
 
-  const handleCompare = (e: React.MouseEvent) => {
+  const handleCompare = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     if (isCompared) {
@@ -85,9 +99,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
       addToCompare(product)
       toast.success('Hozzáadva az összehasonlításhoz')
     }
-  }
-
-  const imageUrl = getImageUrl(product.image)
+  }, [isCompared, product, removeFromCompare, addToCompare])
 
   return (
     <>
@@ -251,4 +263,6 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
       </article>
     </>
   )
-}
+})
+
+export default ProductCard

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import type { Product } from '@prisma/client'
@@ -79,10 +79,10 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     }
   }, [favorites, status])
 
-  const isFavorite = (id: number) => favorites.some((item) => item.id === id)
+  const isFavorite = useCallback((id: number) => favorites.some((item) => item.id === id), [favorites])
 
-  const toggleFavorite = async (product: FavoriteProduct) => {
-    const isFav = isFavorite(product.id)
+  const toggleFavorite = useCallback(async (product: FavoriteProduct) => {
+    const isFav = favorites.some((item) => item.id === product.id)
 
     // Optimistic update
     if (isFav) {
@@ -109,9 +109,15 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         toast.error('Nem sikerült szinkronizálni a szerverrel.')
       }
     }
-  }
+  }, [favorites, status])
 
-  return <FavoritesContext.Provider value={{ favorites, toggleFavorite, isFavorite }}>{children}</FavoritesContext.Provider>
+  const contextValue = useMemo(() => ({ 
+    favorites, 
+    toggleFavorite, 
+    isFavorite 
+  }), [favorites, toggleFavorite, isFavorite])
+
+  return <FavoritesContext.Provider value={contextValue}>{children}</FavoritesContext.Provider>
 }
 
 export const useFavorites = () => {

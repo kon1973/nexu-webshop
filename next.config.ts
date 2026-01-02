@@ -4,7 +4,11 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   experimental: {
     cpus: 1,
+    optimizePackageImports: ['lucide-react', '@prisma/client', 'sonner'],
   },
+  // Enable compression
+  compress: true,
+  // Optimize images
   images: {
     remotePatterns: [
       {
@@ -24,7 +28,14 @@ const nextConfig: NextConfig = {
         hostname: 'images.unsplash.com',
       },
     ],
+    // Optimize image loading
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
+    formats: ['image/avif', 'image/webp'],
   },
+  // Performance optimizations
+  poweredByHeader: false,
+  reactStrictMode: true,
 };
 
 export default withSentryConfig(nextConfig, {

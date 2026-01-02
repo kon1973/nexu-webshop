@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 
 export type CartItem = {
@@ -64,7 +64,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [coupon, setCoupon] = useState<Coupon | null>(null)
   const [isCartOpen, setIsCartOpen] = useState(false)
-  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+  const itemCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart])
   const isInitialMount = useRef(true)
 
   // Load from LocalStorage on mount
@@ -158,23 +158,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [coupon])
 
-  const applyCoupon = (c: Coupon) => setCoupon(c)
-  const removeCoupon = () => setCoupon(null)
+  const applyCoupon = useCallback((c: Coupon) => setCoupon(c), [])
+  const removeCoupon = useCallback(() => setCoupon(null), [])
 
-  const areOptionsEqual = (a?: Record<string, string>, b?: Record<string, string>) => {
+  const areOptionsEqual = useCallback((a?: Record<string, string>, b?: Record<string, string>) => {
     if (!a && !b) return true
     if (!a || !b) return false
     const keysA = Object.keys(a).sort()
     const keysB = Object.keys(b).sort()
     if (keysA.length !== keysB.length) return false
     return keysA.every((key) => a[key] === b[key])
-  }
+  }, [])
 
-  const areItemsEqual = (item: CartItem, id: number, variantId?: string, selectedOptions?: Record<string, string>) => {
+  const areItemsEqual = useCallback((item: CartItem, id: number, variantId?: string, selectedOptions?: Record<string, string>) => {
     if (item.id !== id) return false
     if (variantId && item.variantId) return item.variantId === variantId
     return areOptionsEqual(item.selectedOptions, selectedOptions)
-  }
+  }, [areOptionsEqual])
 
   const addToCart = (product: CartProduct, quantity?: number, selectedOptions?: Record<string, string>) => {
     const requested = Math.max(0, normalizeQuantity(quantity ?? 1, 1))
@@ -230,18 +230,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return addedQuantity
   }
 
-  const removeFromCart = (id: number, variantId?: string, selectedOptions?: Record<string, string>) => {
+  const removeFromCart = useCallback((id: number, variantId?: string, selectedOptions?: Record<string, string>) => {
     setCart((prevCart) =>
       prevCart.filter((item) => !areItemsEqual(item, id, variantId, selectedOptions))
     )
-  }
+  }, [areItemsEqual])
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCart([])
     setCoupon(null)
-  }
+  }, [])
 
-  const updateQuantity = (id: number, newQuantity: number, variantId?: string, selectedOptions?: Record<string, string>) => {
+  const updateQuantity = useCallback((id: number, newQuantity: number, variantId?: string, selectedOptions?: Record<string, string>) => {
     const requested = normalizeQuantity(newQuantity, 1)
     if (requested < 1) return
 
@@ -254,28 +254,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return { ...item, quantity: Math.min(requested, maxQuantity) }
       })
     )
-  }
+  }, [areItemsEqual])
 
-  const openCart = () => setIsCartOpen(true)
-  const closeCart = () => setIsCartOpen(false)
+  const openCart = useCallback(() => setIsCartOpen(true), [])
+  const closeCart = useCallback(() => setIsCartOpen(false), [])
+
+  const contextValue = useMemo(() => ({
+    cart,
+    itemCount,
+    coupon,
+    applyCoupon,
+    removeCoupon,
+    addToCart,
+    removeFromCart,
+    clearCart,
+    updateQuantity,
+    isCartOpen,
+    openCart,
+    closeCart,
+  }), [cart, itemCount, coupon, applyCoupon, removeCoupon, addToCart, removeFromCart, clearCart, updateQuantity, isCartOpen, openCart, closeCart])
 
   return (
-    <CartContext.Provider
-      value={{
-        cart,
-        itemCount,
-        coupon,
-        applyCoupon,
-        removeCoupon,
-        addToCart,
-        removeFromCart,
-        clearCart,
-        updateQuantity,
-        isCartOpen,
-        openCart,
-        closeCart,
-      }}
-    >
+    <CartContext.Provider value={contextValue}>
       {children}
     </CartContext.Provider>
   )
