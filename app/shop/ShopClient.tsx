@@ -9,6 +9,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import type { Product, Banner, Category, Brand } from '@prisma/client'
 import { SearchX, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import RecentlyViewed from '@/app/components/RecentlyViewed'
+import type { SelectedSpec } from './SpecificationFilters'
 
 type ProductWithVariants = Product & {
   variants: { id: string }[]
@@ -103,6 +104,40 @@ export default function ShopClient({
   const isNew = searchParams.get('isNew') === 'true'
   const minRating = Number(searchParams.get('minRating')) || 0
   const selectedBrand = searchParams.get('brand') || ''
+  
+  // Specification filters from URL (format: specs=key1:value1,value2;key2:value3)
+  const parseSpecs = (specString: string | null): SelectedSpec[] => {
+    if (!specString) return []
+    try {
+      return specString.split(';').filter(Boolean).map(part => {
+        const [key, valuesStr] = part.split(':')
+        return { 
+          key: decodeURIComponent(key), 
+          values: valuesStr?.split(',').map(v => decodeURIComponent(v)) || [],
+          type: 'text' as const
+        }
+      }).filter(s => s.key && s.values && s.values.length > 0)
+    } catch {
+      return []
+    }
+  }
+  
+  const selectedSpecs = parseSpecs(searchParams.get('specs'))
+  
+  const updateSpecs = (newSpecs: SelectedSpec[]) => {
+    const params = new URLSearchParams(searchParams.toString())
+    const textSpecs = newSpecs.filter(s => s.values && s.values.length > 0)
+    if (textSpecs.length === 0) {
+      params.delete('specs')
+    } else {
+      const specString = textSpecs
+        .map(s => `${encodeURIComponent(s.key)}:${s.values!.map(v => encodeURIComponent(v)).join(',')}`)
+        .join(';')
+      params.set('specs', specString)
+    }
+    params.delete('page')
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-purple-500/30">
@@ -181,6 +216,8 @@ export default function ShopClient({
                 brands={brands}
                 selectedBrand={selectedBrand}
                 setSelectedBrand={(val) => updateFilter('brand', val)}
+                selectedSpecs={selectedSpecs}
+                setSelectedSpecs={updateSpecs}
               />
             </div>
           </aside>
@@ -197,7 +234,7 @@ export default function ShopClient({
             </div>
 
             {/* Active filters on mobile */}
-            {(selectedCategorySlug || searchTerm || currentMinPrice > 0 || currentMaxPrice < globalMaxPrice || inStock || onSale || isNew || minRating > 0 || selectedBrand) && (
+            {(selectedCategorySlug || searchTerm || currentMinPrice > 0 || currentMaxPrice < globalMaxPrice || inStock || onSale || isNew || minRating > 0 || selectedBrand || selectedSpecs.length > 0) && (
               <div className="flex flex-wrap gap-2 mb-4 lg:hidden">
                 {selectedCategorySlug && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full">
@@ -255,6 +292,25 @@ export default function ShopClient({
                     </button>
                   </span>
                 )}
+                {selectedSpecs.map(spec => (spec.values || []).map(value => (
+                  <span key={`${spec.key}-${value}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full">
+                    {spec.key}: {value}
+                    <button 
+                      onClick={() => {
+                        const newSpecs = selectedSpecs.map(s => {
+                          if (s.key === spec.key) {
+                            return { ...s, values: (s.values || []).filter(v => v !== value) }
+                          }
+                          return s
+                        }).filter(s => s.values && s.values.length > 0)
+                        updateSpecs(newSpecs)
+                      }} 
+                      className="hover:text-white"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                )))}
                 {(currentMinPrice > 0 || currentMaxPrice < globalMaxPrice) && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
                     {currentMinPrice.toLocaleString('hu-HU')} - {currentMaxPrice.toLocaleString('hu-HU')} Ft

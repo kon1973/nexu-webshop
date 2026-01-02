@@ -40,10 +40,11 @@ export type GetProductsParams = {
   isNew?: boolean
   minRating?: number
   brandId?: string
+  specifications?: { key: string; values: string[] }[]
 }
 
 export async function getProductsService(params: GetProductsParams) {
-  const { page = 1, limit = 20, search, category, stock, sort, minPrice, maxPrice, isArchived, inStock, onSale, isNew, minRating, brandId } = params
+  const { page = 1, limit = 20, search, category, stock, sort, minPrice, maxPrice, isArchived, inStock, onSale, isNew, minRating, brandId, specifications } = params
   const skip = (page - 1) * limit
 
   const searchTerms = search ? search.trim().split(/\s+/).filter(t => t.length > 0) : []
@@ -94,12 +95,13 @@ export async function getProductsService(params: GetProductsParams) {
   if (sort === 'name_desc' || sort === 'name-desc') orderBy = { name: 'desc' }
   if (sort === 'rating') orderBy = { rating: 'desc' }
 
-  const [products, totalCount] = await Promise.all([
+  // First get products with basic filters
+  let [products, totalCount] = await Promise.all([
     prisma.product.findMany({
       where,
       orderBy,
-      take: limit,
-      skip,
+      take: specifications?.length ? undefined : limit, // Get all if filtering by specs
+      skip: specifications?.length ? undefined : skip,
       include: {
         variants: true,
         options: true,
@@ -108,6 +110,37 @@ export async function getProductsService(params: GetProductsParams) {
     }),
     prisma.product.count({ where }),
   ])
+
+  // Filter by specifications in JavaScript (since specs is a JSON field)
+  if (specifications && specifications.length > 0) {
+    products = products.filter(product => {
+      const productSpecs = product.specifications as Array<{ key: string; value: string | boolean; type: string }> | null
+      if (!productSpecs || !Array.isArray(productSpecs)) return false
+
+      // All specification filters must match (AND logic between different keys)
+      return specifications.every(specFilter => {
+        // Find all product specs with matching key
+        const matchingSpecs = productSpecs.filter(ps => ps.key === specFilter.key)
+        if (matchingSpecs.length === 0) return false
+
+        // At least one value must match (OR logic within same key)
+        return specFilter.values.some(filterValue => {
+          return matchingSpecs.some(ps => {
+            if (typeof ps.value === 'boolean') {
+              return filterValue === 'Igen' ? ps.value === true : ps.value === false
+            }
+            return String(ps.value) === filterValue
+          })
+        })
+      })
+    })
+    
+    // Update total count for spec-filtered results
+    totalCount = products.length
+    
+    // Apply pagination after spec filtering
+    products = products.slice(skip, skip + limit)
+  }
 
   return {
     products,

@@ -28,6 +28,13 @@ export default async function ShopPage({
   const isNew = params.isNew === 'true'
   const minRating = params.minRating ? Number(params.minRating) : undefined
   const brandId = typeof params.brand === 'string' ? params.brand : undefined
+  
+  // Parse specification filters (format: specs=key1:value1,value2;key2:value3)
+  const specsParam = typeof params.specs === 'string' ? params.specs : undefined
+  const specifications = specsParam ? specsParam.split(';').filter(Boolean).map(part => {
+    const [key, valuesStr] = part.split(':')
+    return { key: decodeURIComponent(key), values: valuesStr?.split(',').map(v => decodeURIComponent(v)) || [] }
+  }).filter(s => s.key && s.values.length > 0) : undefined
 
   let currentCategory = null
   if (category) {
@@ -50,7 +57,8 @@ export default async function ShopPage({
       onSale,
       isNew,
       minRating,
-      brandId
+      brandId,
+      specifications
     }),
     prisma.banner.findMany({
       where: { isActive: true, location: 'SHOP' },

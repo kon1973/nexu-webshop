@@ -1,7 +1,8 @@
 'use client'
 
-import { Search, Filter, X, Star, Zap, Package, Sparkles, Check, Tag } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { Search, Filter, X, Star, Zap, Package, Sparkles, Check, Tag, SlidersHorizontal, RotateCcw } from 'lucide-react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import SpecificationFilters, { type SelectedSpec } from './SpecificationFilters'
 
 type Props = {
   searchTerm: string
@@ -33,6 +34,9 @@ type Props = {
   brands?: { id: string; name: string; logo?: string | null }[]
   selectedBrand?: string
   setSelectedBrand?: (value: string) => void
+  // Specification filters
+  selectedSpecs?: SelectedSpec[]
+  setSelectedSpecs?: (specs: SelectedSpec[]) => void
 }
 
 export default function FilterPanel({
@@ -63,11 +67,14 @@ export default function FilterPanel({
   brands = [],
   selectedBrand,
   setSelectedBrand,
+  selectedSpecs = [],
+  setSelectedSpecs,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'filters' | 'sort'>('filters')
   
   // Count active filters
-  const activeFilterCount = [
+  const activeFilterCount = useMemo(() => [
     category,
     searchTerm,
     minPrice > 0,
@@ -78,60 +85,117 @@ export default function FilterPanel({
     minRating && minRating > 0,
     isNew,
     selectedBrand,
-  ].filter(Boolean).length
+    selectedSpecs.length > 0,
+  ].filter(Boolean).length, [category, searchTerm, minPrice, maxPrice, maxLimit, showFavoritesOnly, inStock, onSale, minRating, isNew, selectedBrand, selectedSpecs])
 
+  // Prevent body scroll when mobile filter is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
 
   return (
     <>
       {/* Mobile Filter Toggle - Fixed at bottom */}
-      <div className="lg:hidden fixed bottom-4 left-4 right-4 z-40">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 rounded-2xl font-bold shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transition-all active:scale-[0.98]"
-        >
-          <Filter size={20} /> 
-          <span>Szűrők</span>
-          {activeFilterCount > 0 && (
-            <span className="px-2.5 py-0.5 bg-white/20 rounded-full text-sm font-bold">{activeFilterCount}</span>
-          )}
-        </button>
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 p-3 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/95 to-transparent pb-safe">
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setIsOpen(true); setActiveTab('filters') }}
+            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3.5 px-4 rounded-2xl font-bold shadow-xl shadow-purple-500/20 active:scale-[0.98] transition-transform"
+          >
+            <SlidersHorizontal size={18} /> 
+            <span>Szűrők</span>
+            {activeFilterCount > 0 && (
+              <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">{activeFilterCount}</span>
+            )}
+          </button>
+          <button
+            onClick={() => { setIsOpen(true); setActiveTab('sort') }}
+            className="flex items-center justify-center gap-2 bg-white/10 text-white py-3.5 px-4 rounded-2xl font-medium border border-white/10 active:scale-[0.98] transition-transform"
+          >
+            <Filter size={18} />
+            <span className="hidden xs:inline">Rendezés</span>
+          </button>
+        </div>
       </div>
 
       {/* Mobile Filter Overlay - Full screen bottom sheet */}
       {isOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] bg-[#0a0a0a] border-t border-white/10 rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col">
+          <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
+            onClick={() => setIsOpen(false)} 
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[90vh] bg-[#0a0a0a] border-t border-white/10 rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300">
             {/* Handle bar */}
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-12 h-1.5 bg-white/20 rounded-full" />
+            <div className="flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 bg-white/20 rounded-full" />
             </div>
             
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pb-4 border-b border-white/10">
-              <h2 className="text-xl font-bold text-white">Szűrők és rendezés</h2>
+            {/* Header with tabs */}
+            <div className="flex items-center justify-between px-4 pb-3 border-b border-white/10">
+              <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+                <button
+                  onClick={() => setActiveTab('filters')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    activeTab === 'filters' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Szűrők
+                </button>
+                <button
+                  onClick={() => setActiveTab('sort')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    activeTab === 'sort' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Rendezés
+                </button>
+              </div>
               <button 
                 onClick={() => setIsOpen(false)} 
-                className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 text-white transition-colors"
+                className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white transition-colors"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
             
             {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto p-5 pb-24">
-              <FilterContent 
-                {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands, selectedBrand, setSelectedBrand }} 
-              />
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 pb-28">
+              {activeTab === 'filters' ? (
+                <MobileFilterContent 
+                  {...{ searchTerm, setSearchTerm, category, setCategory, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands, selectedBrand, setSelectedBrand, selectedSpecs, setSelectedSpecs }} 
+                />
+              ) : (
+                <MobileSortContent sort={sort} setSort={setSort} />
+              )}
             </div>
             
-            {/* Fixed apply button */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a] to-transparent pt-8">
+            {/* Fixed bottom buttons */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a] to-transparent pt-8 flex gap-3">
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={onReset}
+                  className="flex items-center justify-center gap-2 py-3.5 px-5 bg-white/5 border border-white/10 text-gray-300 font-medium rounded-2xl active:scale-[0.98] transition-transform"
+                >
+                  <RotateCcw size={16} />
+                </button>
+              )}
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl shadow-lg shadow-purple-500/30"
+                className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl shadow-lg shadow-purple-500/20 active:scale-[0.98] transition-transform"
               >
-                Szűrők alkalmazása
+                {activeFilterCount > 0 ? `${activeFilterCount} szűrő alkalmazása` : 'Bezárás'}
               </button>
             </div>
           </div>
@@ -139,12 +203,272 @@ export default function FilterPanel({
       )}
 
       {/* Desktop Filter Panel */}
-      <div className="hidden lg:block bg-[#121212] p-6 rounded-3xl border border-white/5 space-y-8 shadow-xl sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      <div className="hidden lg:block bg-[#121212] p-5 rounded-2xl border border-white/5 space-y-6 shadow-xl sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar">
         <FilterContent 
-          {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands, selectedBrand, setSelectedBrand }} 
+          {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands, selectedBrand, setSelectedBrand, selectedSpecs, setSelectedSpecs }} 
         />
       </div>
     </>
+  )
+}
+
+// Mobile Sort Content - Separate component for sort options on mobile
+function MobileSortContent({ sort, setSort }: { sort: string; setSort: (value: string) => void }) {
+  const sortOptions = [
+    { value: 'newest', label: 'Legújabb elöl', icon: '🆕' },
+    { value: 'price-asc', label: 'Olcsóbb elöl', icon: '💰' },
+    { value: 'price-desc', label: 'Drágább elöl', icon: '💎' },
+    { value: 'rating', label: 'Legjobb értékelés', icon: '⭐' },
+    { value: 'name-asc', label: 'Név szerint (A-Z)', icon: '🔤' },
+    { value: 'name-desc', label: 'Név szerint (Z-A)', icon: '🔤' },
+  ]
+
+  return (
+    <div className="space-y-2">
+      {sortOptions.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => setSort(option.value)}
+          className={`w-full text-left p-4 rounded-xl transition-all flex items-center justify-between ${
+            sort === option.value
+              ? 'bg-purple-600 text-white'
+              : 'bg-white/5 text-gray-300 hover:bg-white/10'
+          }`}
+        >
+          <span className="flex items-center gap-3">
+            <span className="text-lg">{option.icon}</span>
+            <span className="font-medium">{option.label}</span>
+          </span>
+          {sort === option.value && <Check size={18} />}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Mobile Filter Content - Optimized for touch
+type MobileFilterContentProps = {
+  searchTerm: string
+  setSearchTerm: (value: string) => void
+  category: string
+  setCategory: (value: string) => void
+  minPrice: number
+  setMinPrice: (value: number) => void
+  maxPrice: number
+  setMaxPrice: (value: number) => void
+  maxLimit: number
+  showFavoritesOnly: boolean
+  toggleFavoritesOnly: () => void
+  favoritesCount: number
+  onReset: () => void
+  categories: { name: string; slug: string }[]
+  inStock?: boolean
+  setInStock?: (value: boolean) => void
+  onSale?: boolean
+  setOnSale?: (value: boolean) => void
+  minRating?: number
+  setMinRating?: (value: number) => void
+  isNew?: boolean
+  setIsNew?: (value: boolean) => void
+  brands?: { id: string; name: string; logo?: string | null }[]
+  selectedBrand?: string
+  setSelectedBrand?: (value: string) => void
+  selectedSpecs?: SelectedSpec[]
+  setSelectedSpecs?: (specs: SelectedSpec[]) => void
+}
+
+function MobileFilterContent({
+  searchTerm, setSearchTerm, category, setCategory, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands = [], selectedBrand, setSelectedBrand, selectedSpecs = [], setSelectedSpecs
+}: MobileFilterContentProps) {
+  return (
+    <div className="space-y-6">
+      {/* Quick filters as chips */}
+      <div>
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Gyors szűrők</h3>
+        <div className="flex flex-wrap gap-2">
+          {setInStock && (
+            <button
+              type="button"
+              onClick={() => setInStock(!inStock)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                inStock 
+                  ? 'bg-green-600 text-white' 
+                  : 'bg-white/5 text-gray-400 border border-white/10'
+              }`}
+            >
+              <Package size={14} />
+              Készleten
+            </button>
+          )}
+          {setOnSale && (
+            <button
+              type="button"
+              onClick={() => setOnSale(!onSale)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                onSale 
+                  ? 'bg-red-600 text-white' 
+                  : 'bg-white/5 text-gray-400 border border-white/10'
+              }`}
+            >
+              <Zap size={14} />
+              Akciós
+            </button>
+          )}
+          {setIsNew && (
+            <button
+              type="button"
+              onClick={() => setIsNew(!isNew)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                isNew 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-white/5 text-gray-400 border border-white/10'
+              }`}
+            >
+              <Sparkles size={14} />
+              Új termék
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Categories */}
+      <div>
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Kategória</h3>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setCategory('')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              category === ''
+                ? 'bg-purple-600 text-white'
+                : 'bg-white/5 text-gray-400 border border-white/10'
+            }`}
+          >
+            Mind
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat.slug || cat.name}
+              type="button"
+              onClick={() => setCategory(cat.name)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                category === cat.name
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white/5 text-gray-400 border border-white/10'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Brands */}
+      {brands.length > 0 && setSelectedBrand && (
+        <div>
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Márka</h3>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedBrand('')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                !selectedBrand
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white/5 text-gray-400 border border-white/10'
+              }`}
+            >
+              Mind
+            </button>
+            {brands.map((brand) => (
+              <button
+                key={brand.id}
+                type="button"
+                onClick={() => setSelectedBrand(brand.id)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                  selectedBrand === brand.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white/5 text-gray-400 border border-white/10'
+                }`}
+              >
+                {brand.logo && <img src={brand.logo} alt="" className="w-4 h-4 object-contain rounded" />}
+                {brand.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Price range */}
+      <div>
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Ár</h3>
+        <div className="bg-white/5 p-4 rounded-xl space-y-4">
+          <div>
+            <div className="flex justify-between text-xs text-gray-400 mb-2">
+              <span>Min: {minPrice.toLocaleString('hu-HU')} Ft</span>
+              <span>Max: {maxPrice.toLocaleString('hu-HU')} Ft</span>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="range"
+                min="0"
+                max={maxLimit}
+                step="5000"
+                value={minPrice}
+                onChange={(e) => setMinPrice(Number(e.target.value))}
+                className="w-full h-2 bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer accent-purple-500"
+              />
+              <input
+                type="range"
+                min="0"
+                max={maxLimit}
+                step="5000"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(Number(e.target.value))}
+                className="w-full h-2 bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer accent-purple-500"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Rating */}
+      {setMinRating && (
+        <div>
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Értékelés</h3>
+          <div className="flex gap-2">
+            {[4, 3, 2, 1].map((rating) => (
+              <button
+                key={rating}
+                type="button"
+                onClick={() => setMinRating(minRating === rating ? 0 : rating)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all flex flex-col items-center gap-1 ${
+                  minRating === rating
+                    ? 'bg-yellow-500/20 border-2 border-yellow-500 text-yellow-400'
+                    : 'bg-white/5 text-gray-400 border border-white/10'
+                }`}
+              >
+                <span className="flex">
+                  {[...Array(rating)].map((_, i) => (
+                    <Star key={i} size={12} className="text-yellow-400 fill-yellow-400" />
+                  ))}
+                </span>
+                <span className="text-xs">{rating}+</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Specification Filters */}
+      {setSelectedSpecs && (
+        <SpecificationFilters
+          category={category}
+          selectedSpecs={selectedSpecs}
+          onSpecsChange={setSelectedSpecs}
+        />
+      )}
+    </div>
   )
 }
 
@@ -176,10 +500,12 @@ type FilterContentProps = {
   brands?: { id: string; name: string; logo?: string | null }[]
   selectedBrand?: string
   setSelectedBrand?: (value: string) => void
+  selectedSpecs?: SelectedSpec[]
+  setSelectedSpecs?: (specs: SelectedSpec[]) => void
 }
 
 function FilterContent({
-  searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands = [], selectedBrand, setSelectedBrand
+  searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew, brands = [], selectedBrand, setSelectedBrand, selectedSpecs = [], setSelectedSpecs
 }: FilterContentProps) {
   return (
     <div className="space-y-8">
@@ -488,6 +814,15 @@ function FilterContent({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Specification Filters */}
+      {setSelectedSpecs && (
+        <SpecificationFilters
+          category={category}
+          selectedSpecs={selectedSpecs}
+          onSpecsChange={setSelectedSpecs}
+        />
       )}
 
       <hr className="border-white/5" />
