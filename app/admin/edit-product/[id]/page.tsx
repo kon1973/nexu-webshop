@@ -11,7 +11,7 @@ export default async function EditProductPage(props: { params: Promise<{ id: str
 
   if (Number.isNaN(id)) return notFound()
 
-  const [product, categories, attributes, specTemplates] = await Promise.all([
+  const [product, categories, attributes, specTemplates, brands] = await Promise.all([
     prisma.product.findUnique({
       where: { id },
       include: {
@@ -21,7 +21,8 @@ export default async function EditProductPage(props: { params: Promise<{ id: str
     }),
     getCategoriesService(),
     getAllAttributesService(),
-    getSpecificationTemplatesService()
+    getSpecificationTemplatesService(),
+    prisma.brand.findMany({ where: { isVisible: true }, orderBy: { name: 'asc' } })
   ])
 
   if (!product) return notFound()
@@ -33,6 +34,7 @@ export default async function EditProductPage(props: { params: Promise<{ id: str
         initialCategories={categories}
         initialAttributes={attributes}
         initialSpecTemplates={specTemplates as any}
+        initialBrands={brands}
       />
     </div>
   )

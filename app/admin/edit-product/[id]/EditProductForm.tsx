@@ -44,6 +44,12 @@ type Category = {
   name: string
 }
 
+type Brand = {
+  id: string
+  name: string
+  logo?: string | null
+}
+
 type SpecTemplate = {
   id: string
   name: string
@@ -55,9 +61,10 @@ type Props = {
   initialCategories: Category[]
   initialAttributes: Attribute[]
   initialSpecTemplates: SpecTemplate[]
+  initialBrands: Brand[]
 }
 
-export default function EditProductForm({ product, initialCategories, initialAttributes, initialSpecTemplates }: Props) {
+export default function EditProductForm({ product, initialCategories, initialAttributes, initialSpecTemplates, initialBrands }: Props) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [images, setImages] = useState<string[]>(product.images && product.images.length > 0 ? product.images : [product.image])
@@ -67,6 +74,7 @@ export default function EditProductForm({ product, initialCategories, initialAtt
   // Attributes state
   const [availableAttributes, setAvailableAttributes] = useState<Attribute[]>(initialAttributes)
   const [categories, setCategories] = useState<Category[]>(initialCategories)
+  const [brands] = useState<Brand[]>(initialBrands)
   const [selectedAttributeIds, setSelectedAttributeIds] = useState<string[]>([])
   const [variants, setVariants] = useState<Variant[]>([])
   const [basePrice, setBasePrice] = useState<number>(product.price)
@@ -78,6 +86,7 @@ export default function EditProductForm({ product, initialCategories, initialAtt
   const [description, setDescription] = useState(product.description)
   const [fullDescription, setFullDescription] = useState((product as any).fullDescription || '')
   const [categoryId, setCategoryId] = useState(product.category)
+  const [brandId, setBrandId] = useState<string>((product as any).brandId || '')
 
   // Sale state
   const [saleType, setSaleType] = useState<'FIXED' | 'PERCENTAGE'>(product.salePercentage ? 'PERCENTAGE' : 'FIXED')
@@ -319,6 +328,7 @@ export default function EditProductForm({ product, initialCategories, initialAtt
       image: images[0] || '\u{1f4e6}',
       images: images,
       isArchived: isArchived,
+      brandId: brandId || null,
       specifications: specifications.filter(s => {
         if (!s.key) return false
         if (s.type === 'header') return true
@@ -368,6 +378,7 @@ export default function EditProductForm({ product, initialCategories, initialAtt
         <form onSubmit={handleSubmit} className="space-y-8">
             <ProductBasicInfo
               categories={categories}
+              brands={brands}
               basePrice={basePrice}
               setBasePrice={setBasePrice}
               baseStock={baseStock}
@@ -380,6 +391,8 @@ export default function EditProductForm({ product, initialCategories, initialAtt
               setName={setName}
               categoryId={categoryId}
               setCategoryId={setCategoryId}
+              brandId={brandId}
+              setBrandId={setBrandId}
               saleType={saleType}
               setSaleType={setSaleType}
               salePrice={salePrice}

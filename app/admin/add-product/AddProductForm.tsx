@@ -43,13 +43,20 @@ type Category = {
   name: string
 }
 
+type Brand = {
+  id: string
+  name: string
+  logo?: string | null
+}
+
 type Props = {
   initialCategories: Category[]
   initialAttributes: Attribute[]
   initialSpecTemplates: any[] // Using any for now as the type from service might be complex
+  initialBrands: Brand[]
 }
 
-export default function AddProductForm({ initialCategories, initialAttributes, initialSpecTemplates }: Props) {
+export default function AddProductForm({ initialCategories, initialAttributes, initialSpecTemplates, initialBrands }: Props) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [images, setImages] = useState<string[]>([])
@@ -59,6 +66,7 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
   // Attributes state
   const [availableAttributes, setAvailableAttributes] = useState<Attribute[]>(initialAttributes)
   const [categories, setCategories] = useState<Category[]>(initialCategories)
+  const [brands] = useState<Brand[]>(initialBrands)
   const [selectedAttributeIds, setSelectedAttributeIds] = useState<string[]>([])
   const [variants, setVariants] = useState<Variant[]>([])
   const [basePrice, setBasePrice] = useState<number>(0)
@@ -70,6 +78,7 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
   const [description, setDescription] = useState('')
   const [fullDescription, setFullDescription] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [brandId, setBrandId] = useState('')
 
   // Sale State
   const [saleType, setSaleType] = useState<'FIXED' | 'PERCENTAGE'>('FIXED')
@@ -248,6 +257,7 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
       image: images[0] || '\u{1f4e6}',
       images: images,
       isArchived: isArchived,
+      brandId: brandId || null,
       specifications: specifications.filter(s => s.key && (s.type === 'header' || s.value !== '')),
       variants: variants.map(v => ({
         attributes: v.attributes,
@@ -290,6 +300,7 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
           <form onSubmit={handleSubmit} className="space-y-8">
             <ProductBasicInfo
               categories={categories}
+              brands={brands}
               basePrice={basePrice}
               setBasePrice={setBasePrice}
               baseStock={baseStock}
@@ -302,6 +313,8 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
               setName={setName}
               categoryId={categoryId}
               setCategoryId={setCategoryId}
+              brandId={brandId}
+              setBrandId={setBrandId}
               saleType={saleType}
               setSaleType={setSaleType}
               salePrice={salePrice}

@@ -19,6 +19,7 @@ export const ProductSchema = z.object({
   specifications: z.array(z.any()).default([]),
   options: z.array(z.any()).default([]),
   isArchived: z.boolean().default(false),
+  brandId: z.string().optional().nullable(),
 })
 
 export type CreateProductInput = z.infer<typeof ProductSchema>
@@ -132,7 +133,7 @@ export async function getProductByIdService(id: number, onlyApprovedReviews = fa
 }
 
 export async function createProductService(data: CreateProductInput) {
-  const { name, category, price, stock, salePrice, salePercentage, saleStartDate, saleEndDate, description, fullDescription, image, images, variants, specifications, isArchived } = data
+  const { name, category, price, stock, salePrice, salePercentage, saleStartDate, saleEndDate, description, fullDescription, image, images, variants, specifications, isArchived, brandId } = data
 
   // Calculate stock from variants if they exist
   let finalStock = stock
@@ -176,6 +177,7 @@ export async function createProductService(data: CreateProductInput) {
       images,
       specifications,
       isArchived,
+      brandId: brandId || null,
       rating: 5.0,
       options: {
         create: optionsData
@@ -198,7 +200,7 @@ export async function createProductService(data: CreateProductInput) {
 }
 
 export async function updateProductService(id: number, data: UpdateProductInput) {
-  const { name, category, price, stock, salePrice, salePercentage, saleStartDate, saleEndDate, description, fullDescription, image, images, variants, specifications, isArchived } = data
+  const { name, category, price, stock, salePrice, salePercentage, saleStartDate, saleEndDate, description, fullDescription, image, images, variants, specifications, isArchived, brandId } = data
 
   // Calculate stock from variants if they exist
   let finalStock = stock
@@ -225,6 +227,7 @@ export async function updateProductService(id: number, data: UpdateProductInput)
         ...(images ? { images } : {}),
         ...(isArchived !== undefined ? { isArchived } : {}),
         ...(specifications ? { specifications } : {}),
+        brandId: brandId === undefined ? undefined : (brandId || null),
       },
     })
 

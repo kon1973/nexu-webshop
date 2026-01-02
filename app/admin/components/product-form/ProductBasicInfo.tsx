@@ -6,6 +6,9 @@ type Props = {
   categoryId: string
   setCategoryId: Dispatch<SetStateAction<string>>
   categories: { id: string; name: string }[]
+  brands?: { id: string; name: string; logo?: string | null }[]
+  brandId?: string
+  setBrandId?: Dispatch<SetStateAction<string>>
   basePrice: number
   setBasePrice: Dispatch<SetStateAction<number>>
   baseStock: number
@@ -33,6 +36,9 @@ export function ProductBasicInfo({
   categoryId,
   setCategoryId,
   categories,
+  brands = [],
+  brandId = '',
+  setBrandId,
   basePrice,
   setBasePrice,
   baseStock,
@@ -84,6 +90,25 @@ export function ProductBasicInfo({
               ))}
             </select>
           </div>
+
+          {brands.length > 0 && setBrandId && (
+            <div className="sm:col-span-1">
+              <label className="block text-sm font-bold text-gray-400 mb-2">Márka</label>
+              <select
+                name="brandId"
+                value={brandId}
+                onChange={(e) => setBrandId(e.target.value)}
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none cursor-pointer"
+              >
+                <option value="">Nincs márka</option>
+                {brands.map((brand) => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="sm:col-span-1">
             <label className="block text-sm font-bold text-gray-400 mb-2">Alap Ár (Ft)</label>
