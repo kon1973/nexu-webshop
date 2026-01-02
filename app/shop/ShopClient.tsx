@@ -105,28 +105,59 @@ export default function ShopClient({
   const minRating = Number(searchParams.get('minRating')) || 0
   const selectedBrand = searchParams.get('brand') || ''
   
-  // Specification filters from URL (format: specs=key1:value1,value2;key2:value3)
-  const parseSpecs = (specString: string | null): SelectedSpec[] => {
-    if (!specString) return []
-    try {
-      return specString.split(';').filter(Boolean).map(part => {
-        const [key, valuesStr] = part.split(':')
-        return { 
-          key: decodeURIComponent(key), 
-          values: valuesStr?.split(',').map(v => decodeURIComponent(v)) || [],
-          type: 'text' as const
-        }
-      }).filter(s => s.key && s.values && s.values.length > 0)
-    } catch {
-      return []
+  // Specification filters from URL
+  // Format: specs=key1:value1,value2;key2:value3 (text/range specs)
+  // Format: boolSpecs=key1:true;key2:false (boolean specs)
+  const parseSpecs = (specString: string | null, boolSpecString: string | null): SelectedSpec[] => {
+    const result: SelectedSpec[] = []
+    
+    // Parse text/range specs
+    if (specString) {
+      try {
+        const textSpecs = specString.split(';').filter(Boolean).map(part => {
+          const [key, valuesStr] = part.split(':')
+          return { 
+            key: decodeURIComponent(key), 
+            values: valuesStr?.split(',').map(v => decodeURIComponent(v)) || [],
+            type: 'text' as const
+          }
+        }).filter(s => s.key && s.values && s.values.length > 0)
+        result.push(...textSpecs)
+      } catch {
+        // ignore parse errors
+      }
     }
+    
+    // Parse boolean specs
+    if (boolSpecString) {
+      try {
+        const boolSpecs = boolSpecString.split(';').filter(Boolean).map(part => {
+          const [key, valueStr] = part.split(':')
+          return { 
+            key: decodeURIComponent(key), 
+            boolValue: valueStr === 'true',
+            type: 'boolean' as const
+          }
+        }).filter(s => s.key)
+        result.push(...boolSpecs)
+      } catch {
+        // ignore parse errors
+      }
+    }
+    
+    return result
   }
   
-  const selectedSpecs = parseSpecs(searchParams.get('specs'))
+  const selectedSpecs = parseSpecs(searchParams.get('specs'), searchParams.get('boolSpecs'))
   
   const updateSpecs = (newSpecs: SelectedSpec[]) => {
     const params = new URLSearchParams(searchParams.toString())
-    const textSpecs = newSpecs.filter(s => s.values && s.values.length > 0)
+    
+    // Separate text/range specs and boolean specs
+    const textSpecs = newSpecs.filter(s => s.type !== 'boolean' && s.values && s.values.length > 0)
+    const boolSpecs = newSpecs.filter(s => s.type === 'boolean' && s.boolValue !== undefined)
+    
+    // Update text specs
     if (textSpecs.length === 0) {
       params.delete('specs')
     } else {
@@ -135,6 +166,17 @@ export default function ShopClient({
         .join(';')
       params.set('specs', specString)
     }
+    
+    // Update boolean specs
+    if (boolSpecs.length === 0) {
+      params.delete('boolSpecs')
+    } else {
+      const boolSpecString = boolSpecs
+        .map(s => `${encodeURIComponent(s.key)}:${s.boolValue}`)
+        .join(';')
+      params.set('boolSpecs', boolSpecString)
+    }
+    
     params.delete('page')
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
@@ -292,7 +334,8 @@ export default function ShopClient({
                     </button>
                   </span>
                 )}
-                {selectedSpecs.map(spec => (spec.values || []).map(value => (
+                {/* Text/Range specs */}
+                {selectedSpecs.filter(s => s.type !== 'boolean').map(spec => (spec.values || []).map(value => (
                   <span key={`${spec.key}-${value}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full">
                     {spec.key}: {value}
                     <button 
@@ -302,7 +345,7 @@ export default function ShopClient({
                             return { ...s, values: (s.values || []).filter(v => v !== value) }
                           }
                           return s
-                        }).filter(s => s.values && s.values.length > 0)
+                        }).filter(s => (s.values && s.values.length > 0) || s.type === 'boolean')
                         updateSpecs(newSpecs)
                       }} 
                       className="hover:text-white"
@@ -311,6 +354,21 @@ export default function ShopClient({
                     </button>
                   </span>
                 )))}
+                {/* Boolean specs */}
+                {selectedSpecs.filter(s => s.type === 'boolean').map(spec => (
+                  <span key={`bool-${spec.key}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
+                    {spec.key}: {spec.boolValue ? 'Igen' : 'Nem'}
+                    <button 
+                      onClick={() => {
+                        const newSpecs = selectedSpecs.filter(s => s.key !== spec.key)
+                        updateSpecs(newSpecs)
+                      }} 
+                      className="hover:text-white"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
                 {(currentMinPrice > 0 || currentMaxPrice < globalMaxPrice) && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
                     {currentMinPrice.toLocaleString('hu-HU')} - {currentMaxPrice.toLocaleString('hu-HU')} Ft

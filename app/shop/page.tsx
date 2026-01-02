@@ -31,10 +31,25 @@ export default async function ShopPage({
   
   // Parse specification filters (format: specs=key1:value1,value2;key2:value3)
   const specsParam = typeof params.specs === 'string' ? params.specs : undefined
-  const specifications = specsParam ? specsParam.split(';').filter(Boolean).map(part => {
+  const boolSpecsParam = typeof params.boolSpecs === 'string' ? params.boolSpecs : undefined
+  
+  // Parse text/range specifications
+  const textSpecifications = specsParam ? specsParam.split(';').filter(Boolean).map(part => {
     const [key, valuesStr] = part.split(':')
     return { key: decodeURIComponent(key), values: valuesStr?.split(',').map(v => decodeURIComponent(v)) || [] }
-  }).filter(s => s.key && s.values.length > 0) : undefined
+  }).filter(s => s.key && s.values.length > 0) : []
+  
+  // Parse boolean specifications and convert to values format for service
+  const boolSpecifications = boolSpecsParam ? boolSpecsParam.split(';').filter(Boolean).map(part => {
+    const [key, valueStr] = part.split(':')
+    // Convert boolean to 'Igen'/'Nem' for the service filter
+    return { key: decodeURIComponent(key), values: [valueStr === 'true' ? 'Igen' : 'Nem'] }
+  }).filter(s => s.key) : []
+  
+  // Combine all specifications
+  const specifications = [...textSpecifications, ...boolSpecifications].length > 0 
+    ? [...textSpecifications, ...boolSpecifications] 
+    : undefined
 
   let currentCategory = null
   if (category) {
