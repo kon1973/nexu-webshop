@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { generateReport, ReportPeriod } from '@/lib/services/reportService'
+import { generateReport, generateCustomRangeReport, ReportPeriod } from '@/lib/services/reportService'
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,6 +12,31 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const period = (searchParams.get('period') || 'monthly') as ReportPeriod
     const dateStr = searchParams.get('date')
+    const startDateStr = searchParams.get('startDate')
+    const endDateStr = searchParams.get('endDate')
+    
+    // Custom date range
+    if (startDateStr && endDateStr) {
+      const startDate = new Date(startDateStr)
+      const endDate = new Date(endDateStr)
+      
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid date format' }, 
+          { status: 400 }
+        )
+      }
+      
+      if (startDate > endDate) {
+        return NextResponse.json(
+          { error: 'Start date must be before end date' }, 
+          { status: 400 }
+        )
+      }
+      
+      const report = await generateCustomRangeReport(startDate, endDate)
+      return NextResponse.json(report)
+    }
     
     // Validate period
     if (!['daily', 'weekly', 'monthly', 'yearly'].includes(period)) {

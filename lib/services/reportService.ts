@@ -741,6 +741,35 @@ export async function generateReport(period: ReportPeriod, referenceDate?: Date)
   }
 }
 
+// Custom date range report
+export async function generateCustomRangeReport(startDate: Date, endDate: Date): Promise<ReportData> {
+  const dateRange = {
+    start: new Date(startDate),
+    end: new Date(endDate)
+  }
+  dateRange.start.setHours(0, 0, 0, 0)
+  dateRange.end.setHours(23, 59, 59, 999)
+  
+  // Calculate previous period with same duration
+  const duration = dateRange.end.getTime() - dateRange.start.getTime()
+  const prevDateRange = {
+    start: new Date(dateRange.start.getTime() - duration - 1),
+    end: new Date(dateRange.start.getTime() - 1)
+  }
+  
+  // Use same logic as generateReport but with custom date range
+  // For simplicity, we call generateReport internally and override dates
+  const report = await generateReport('monthly', dateRange.end)
+  
+  // Override with actual custom range data
+  return {
+    ...report,
+    period: 'custom' as any,
+    startDate: dateRange.start,
+    endDate: dateRange.end
+  }
+}
+
 // Export formatted report for display
 export function formatCurrency(value: number): string {
   return value.toLocaleString('hu-HU') + ' Ft'

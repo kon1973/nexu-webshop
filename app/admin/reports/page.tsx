@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   FileText, 
   Download, 
@@ -21,11 +21,17 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  CalendarDays,
+  ArrowLeftRight,
+  Filter,
+  Eye,
+  FileSpreadsheet,
+  Printer
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly'
+type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom'
 
 interface ReportData {
   period: ReportPeriod
@@ -135,7 +141,8 @@ const periodLabels: Record<ReportPeriod, string> = {
   daily: 'Napi',
   weekly: 'Heti',
   monthly: 'Havi',
-  yearly: 'Éves'
+  yearly: 'Éves',
+  custom: 'Egyedi'
 }
 
 const statusLabels: Record<string, string> = {
@@ -178,20 +185,48 @@ function formatDateTime(dateStr: string): string {
 export default function ReportsPage() {
   const [period, setPeriod] = useState<ReportPeriod>('monthly')
   const [report, setReport] = useState<ReportData | null>(null)
+  const [compareReport, setCompareReport] = useState<ReportData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [activeSection, setActiveSection] = useState<string>('overview')
+  const [showCompare, setShowCompare] = useState(false)
+  const [showCustomRange, setShowCustomRange] = useState(false)
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
+  const [autoRefresh, setAutoRefresh] = useState(false)
 
   useEffect(() => {
     fetchReport()
   }, [period])
 
+  // Auto refresh every 5 minutes if enabled
+  useEffect(() => {
+    if (!autoRefresh) return
+    const interval = setInterval(fetchReport, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [autoRefresh, period])
+
   const fetchReport = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch(`/api/admin/reports?period=${period}`)
+      let url = `/api/admin/reports?period=${period}`
+      
+      if (period === 'custom' && customStartDate && customEndDate) {
+        url = `/api/admin/reports?startDate=${customStartDate}&endDate=${customEndDate}`
+      }
+      
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
         setReport(data)
+        
+        // Fetch previous period for comparison if enabled
+        if (showCompare && period !== 'custom') {
+          const prevRes = await fetch(`/api/admin/reports?period=${period}&date=${getPreviousDate(period)}`)
+          if (prevRes.ok) {
+            const prevData = await prevRes.json()
+            setCompareReport(prevData)
+          }
+        }
       } else {
         toast.error('Hiba a kimutatás betöltésekor')
       }
@@ -200,6 +235,30 @@ export default function ReportsPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const getPreviousDate = (p: ReportPeriod): string => {
+    const date = new Date()
+    switch (p) {
+      case 'daily': date.setDate(date.getDate() - 1); break
+      case 'weekly': date.setDate(date.getDate() - 7); break
+      case 'monthly': date.setMonth(date.getMonth() - 1); break
+      case 'yearly': date.setFullYear(date.getFullYear() - 1); break
+    }
+    return date.toISOString().split('T')[0]
+  }
+
+  const handleCustomRangeSubmit = () => {
+    if (!customStartDate || !customEndDate) {
+      toast.error('Válassz kezdő és záró dátumot!')
+      return
+    }
+    if (new Date(customStartDate) > new Date(customEndDate)) {
+      toast.error('A kezdő dátum nem lehet későbbi, mint a záró!')
+      return
+    }
+    setPeriod('custom')
+    setShowCustomRange(false)
   }
 
   const exportToCSV = () => {
@@ -397,8 +456,45 @@ export default function ReportsPage() {
               onClick={fetchReport}
               className="bg-[#1a1a1a] hover:bg-[#252525] text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
             >
-              <RefreshCw size={18} />
+              <RefreshCw size={18} className={autoRefresh ? 'animate-spin' : ''} />
               Frissítés
+            </button>
+
+            <button
+              onClick={() => setShowCustomRange(!showCustomRange)}
+              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-colors ${
+                period === 'custom' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-[#1a1a1a] hover:bg-[#252525] text-white'
+              }`}
+            >
+              <CalendarDays size={18} />
+              Egyedi dátum
+            </button>
+
+            <button
+              onClick={() => setShowCompare(!showCompare)}
+              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-colors ${
+                showCompare 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-[#1a1a1a] hover:bg-[#252525] text-white'
+              }`}
+            >
+              <ArrowLeftRight size={18} />
+              Összehasonlítás
+            </button>
+
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-colors ${
+                autoRefresh 
+                  ? 'bg-green-600 text-white' 
+                  : 'bg-[#1a1a1a] hover:bg-[#252525] text-white'
+              }`}
+              title="Automatikus frissítés 5 percenként"
+            >
+              <Eye size={18} />
+              {autoRefresh ? 'Élő' : 'Auto'}
             </button>
             
             <button
@@ -410,6 +506,82 @@ export default function ReportsPage() {
             </button>
           </div>
         </div>
+
+        {/* Custom date range picker */}
+        {showCustomRange && (
+          <div className="bg-[#121212] border border-purple-500/30 rounded-xl p-5 mb-6 animate-in fade-in slide-in-from-top-2">
+            <h3 className="font-bold mb-4 flex items-center gap-2">
+              <CalendarDays className="text-purple-400" size={20} />
+              Egyedi időszak kiválasztása
+            </h3>
+            <div className="flex flex-wrap gap-4 items-end">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Kezdő dátum</label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="px-4 py-2 bg-[#1a1a1a] border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Záró dátum</label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="px-4 py-2 bg-[#1a1a1a] border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <button
+                onClick={handleCustomRangeSubmit}
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-medium transition-colors"
+              >
+                Kimutatás generálása
+              </button>
+              <button
+                onClick={() => {
+                  setShowCustomRange(false)
+                  setPeriod('monthly')
+                }}
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl transition-colors"
+              >
+                Mégse
+              </button>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="text-sm text-gray-500">Gyors választás:</span>
+              {[
+                { label: 'Mai nap', days: 0 },
+                { label: 'Tegnap', days: 1 },
+                { label: 'Utolsó 7 nap', days: 7 },
+                { label: 'Utolsó 30 nap', days: 30 },
+                { label: 'Utolsó 90 nap', days: 90 },
+                { label: 'Ez a év', days: -1 }
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => {
+                    const end = new Date()
+                    const start = new Date()
+                    if (preset.days === -1) {
+                      start.setMonth(0, 1)
+                    } else if (preset.days === 0) {
+                      // Today - same date
+                    } else {
+                      start.setDate(start.getDate() - preset.days)
+                    }
+                    setCustomStartDate(start.toISOString().split('T')[0])
+                    setCustomEndDate(end.toISOString().split('T')[0])
+                  }}
+                  className="px-3 py-1 text-sm bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Generated info */}
         <div className="bg-[#121212] border border-white/5 rounded-xl p-4 mb-6 flex items-center gap-3">
@@ -594,7 +766,13 @@ export default function ReportsPage() {
                   </div>
                 </div>
                 
-                {/* Revenue by day */}
+                {/* Revenue by day - Chart */}
+                <div className="bg-[#121212] border border-white/5 rounded-xl p-5">
+                  <h3 className="text-lg font-bold mb-4">Napi bevétel grafikon</h3>
+                  <RevenueChart data={report.revenue.byDay} />
+                </div>
+
+                {/* Revenue by day - Table */}
                 <div className="bg-[#121212] border border-white/5 rounded-xl p-5">
                   <h3 className="text-lg font-bold mb-4">Napi bontás</h3>
                   <div className="overflow-x-auto">
@@ -697,6 +875,14 @@ export default function ReportsPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Orders by hour */}
+                {report.orders.byHour && report.orders.byHour.length > 0 && (
+                  <div className="bg-[#121212] border border-white/5 rounded-xl p-5">
+                    <h3 className="text-lg font-bold mb-4">Rendelések órák szerint</h3>
+                    <HourlyChart data={report.orders.byHour} />
+                  </div>
+                )}
               </div>
             )}
 
@@ -730,28 +916,35 @@ export default function ReportsPage() {
                   />
                 </div>
 
-                {/* Category breakdown */}
-                <div className="bg-[#121212] border border-white/5 rounded-xl p-5">
-                  <h3 className="text-lg font-bold mb-4">Kategória szerinti bontás</h3>
-                  <div className="space-y-3">
-                    {report.products.byCategory.map(c => (
-                      <div key={c.category} className="p-3 bg-white/5 rounded-lg">
-                        <div className="flex justify-between mb-2">
-                          <span className="font-medium">{c.category}</span>
-                          <span className="text-gray-400">{c.percentage}%</span>
+                {/* Category breakdown with pie chart */}
+                <div className="grid lg:grid-cols-2 gap-4">
+                  <div className="bg-[#121212] border border-white/5 rounded-xl p-5">
+                    <h3 className="text-lg font-bold mb-4">Kategória eloszlás</h3>
+                    <CategoryPieChart data={report.products.byCategory} />
+                  </div>
+                  
+                  <div className="bg-[#121212] border border-white/5 rounded-xl p-5">
+                    <h3 className="text-lg font-bold mb-4">Kategória részletek</h3>
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                      {report.products.byCategory.map(c => (
+                        <div key={c.category} className="p-3 bg-white/5 rounded-lg">
+                          <div className="flex justify-between mb-2">
+                            <span className="font-medium">{c.category}</span>
+                            <span className="text-gray-400">{c.percentage}%</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">{c.quantity} db eladva</span>
+                            <span className="text-emerald-400">{formatCurrency(c.revenue)}</span>
+                          </div>
+                          <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-purple-500 rounded-full"
+                              style={{ width: `${c.percentage}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-400">{c.quantity} db eladva</span>
-                          <span className="text-emerald-400">{formatCurrency(c.revenue)}</span>
-                        </div>
-                        <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-purple-500 rounded-full"
-                            style={{ width: `${c.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -1278,6 +1471,190 @@ function StatCard({
       <div className="text-2xl font-bold mb-1">{value}</div>
       <div className="text-sm text-gray-400">{title}</div>
       {subtitle && <div className="text-xs text-gray-500 mt-1">{subtitle}</div>}
+    </div>
+  )
+}
+
+// Revenue Chart component - simple bar chart
+function RevenueChart({ data }: { data: Array<{ date: string; amount: number; orders: number }> }) {
+  if (!data || data.length === 0) return null
+  
+  const maxAmount = Math.max(...data.map(d => d.amount), 1)
+  const sortedData = [...data].sort((a, b) => a.date.localeCompare(b.date))
+  
+  return (
+    <div className="space-y-4">
+      <div className="h-64 flex items-end gap-1 px-2">
+        {sortedData.map((item, index) => {
+          const height = (item.amount / maxAmount) * 100
+          const date = new Date(item.date)
+          const dayName = date.toLocaleDateString('hu-HU', { weekday: 'short' })
+          
+          return (
+            <div key={item.date} className="flex-1 flex flex-col items-center gap-1 group">
+              <div className="relative w-full flex justify-center">
+                {/* Tooltip */}
+                <div className="absolute bottom-full mb-2 hidden group-hover:block bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-2 text-xs z-10 whitespace-nowrap">
+                  <div className="font-medium">{item.date}</div>
+                  <div className="text-emerald-400">{formatCurrency(item.amount)}</div>
+                  <div className="text-gray-400">{item.orders} rendelés</div>
+                </div>
+                {/* Bar */}
+                <div 
+                  className="w-full max-w-[40px] bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-md transition-all hover:from-emerald-500 hover:to-emerald-300 cursor-pointer"
+                  style={{ height: `${Math.max(height, 2)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-gray-500 truncate w-full text-center">
+                {data.length <= 7 ? dayName : (index % 2 === 0 ? date.getDate() : '')}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex justify-between text-xs text-gray-500 px-2">
+        <span>{sortedData[0]?.date}</span>
+        <span>{sortedData[sortedData.length - 1]?.date}</span>
+      </div>
+    </div>
+  )
+}
+
+// Category Pie Chart component
+function CategoryPieChart({ data }: { data: Array<{ category: string; quantity: number; revenue: number; percentage: number }> }) {
+  if (!data || data.length === 0) return null
+  
+  const colors = [
+    'bg-emerald-500', 'bg-blue-500', 'bg-purple-500', 'bg-amber-500', 
+    'bg-red-500', 'bg-pink-500', 'bg-cyan-500', 'bg-orange-500'
+  ]
+  
+  return (
+    <div className="flex flex-col md:flex-row gap-6 items-center">
+      {/* Simplified pie visualization */}
+      <div className="relative w-48 h-48 flex-shrink-0">
+        <svg viewBox="0 0 100 100" className="transform -rotate-90">
+          {data.reduce((acc, item, index) => {
+            const startAngle = acc.offset
+            const angle = (item.percentage / 100) * 360
+            const endAngle = startAngle + angle
+            
+            const x1 = 50 + 45 * Math.cos((startAngle * Math.PI) / 180)
+            const y1 = 50 + 45 * Math.sin((startAngle * Math.PI) / 180)
+            const x2 = 50 + 45 * Math.cos((endAngle * Math.PI) / 180)
+            const y2 = 50 + 45 * Math.sin((endAngle * Math.PI) / 180)
+            const largeArc = angle > 180 ? 1 : 0
+            
+            acc.elements.push(
+              <path
+                key={item.category}
+                d={`M 50 50 L ${x1} ${y1} A 45 45 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                className={colors[index % colors.length].replace('bg-', 'fill-')}
+                opacity={0.8}
+              />
+            )
+            acc.offset = endAngle
+            return acc
+          }, { elements: [] as React.ReactNode[], offset: 0 }).elements}
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-24 h-24 bg-[#121212] rounded-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-lg font-bold">{data.length}</div>
+              <div className="text-xs text-gray-400">kategória</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Legend */}
+      <div className="flex-1 space-y-2 w-full">
+        {data.slice(0, 6).map((item, index) => (
+          <div key={item.category} className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${colors[index % colors.length]}`} />
+            <span className="flex-1 text-sm truncate">{item.category}</span>
+            <span className="text-sm font-medium">{item.percentage}%</span>
+          </div>
+        ))}
+        {data.length > 6 && (
+          <div className="text-xs text-gray-500 pt-2">+{data.length - 6} további kategória</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Orders by Hour Chart
+function HourlyChart({ data }: { data?: Array<{ hour: number; count: number }> }) {
+  if (!data || data.length === 0) return null
+  
+  const maxCount = Math.max(...data.map(d => d.count), 1)
+  const hours = Array.from({ length: 24 }, (_, i) => {
+    const found = data.find(d => d.hour === i)
+    return { hour: i, count: found?.count || 0 }
+  })
+  
+  return (
+    <div className="space-y-2">
+      <div className="h-32 flex items-end gap-0.5">
+        {hours.map((item) => {
+          const height = (item.count / maxCount) * 100
+          return (
+            <div key={item.hour} className="flex-1 flex flex-col items-center group">
+              <div className="relative w-full flex justify-center">
+                <div className="absolute bottom-full mb-1 hidden group-hover:block bg-[#1a1a1a] px-2 py-1 rounded text-xs z-10">
+                  {item.hour}:00 - {item.count} db
+                </div>
+                <div 
+                  className={`w-full rounded-t-sm transition-all ${
+                    item.count > 0 ? 'bg-blue-500 hover:bg-blue-400' : 'bg-white/5'
+                  }`}
+                  style={{ height: `${Math.max(height, 2)}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex justify-between text-xs text-gray-500">
+        <span>00:00</span>
+        <span>06:00</span>
+        <span>12:00</span>
+        <span>18:00</span>
+        <span>24:00</span>
+      </div>
+    </div>
+  )
+}
+
+// Rating Distribution Chart
+function RatingChart({ data }: { data: Array<{ rating: number; count: number }> }) {
+  if (!data || data.length === 0) return null
+  
+  const maxCount = Math.max(...data.map(d => d.count), 1)
+  
+  return (
+    <div className="space-y-2">
+      {[5, 4, 3, 2, 1].map(rating => {
+        const item = data.find(d => d.rating === rating)
+        const count = item?.count || 0
+        const width = (count / maxCount) * 100
+        
+        return (
+          <div key={rating} className="flex items-center gap-3">
+            <div className="flex items-center gap-1 w-16">
+              {rating} <Star size={14} className="text-yellow-400 fill-yellow-400" />
+            </div>
+            <div className="flex-1 h-6 bg-white/5 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-yellow-500 to-amber-400 rounded-full transition-all"
+                style={{ width: `${width}%` }}
+              />
+            </div>
+            <span className="text-sm w-12 text-right">{count}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
