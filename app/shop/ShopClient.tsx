@@ -94,6 +94,12 @@ export default function ShopClient({
   const currentSort = searchParams.get('sort') || 'newest'
   const currentMinPrice = Number(searchParams.get('minPrice')) || 0
   const currentMaxPrice = Number(searchParams.get('maxPrice')) || globalMaxPrice
+  
+  // New filter states from URL
+  const inStock = searchParams.get('inStock') === 'true'
+  const onSale = searchParams.get('onSale') === 'true'
+  const isNew = searchParams.get('isNew') === 'true'
+  const minRating = Number(searchParams.get('minRating')) || 0
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-purple-500/30">
@@ -161,6 +167,14 @@ export default function ShopClient({
                 favoritesCount={favorites.length}
                 onReset={handleReset}
                 categories={categories}
+                inStock={inStock}
+                setInStock={(val) => updateFilter('inStock', val ? 'true' : '')}
+                onSale={onSale}
+                setOnSale={(val) => updateFilter('onSale', val ? 'true' : '')}
+                isNew={isNew}
+                setIsNew={(val) => updateFilter('isNew', val ? 'true' : '')}
+                minRating={minRating}
+                setMinRating={(val) => updateFilter('minRating', val)}
               />
             </div>
           </aside>
@@ -177,7 +191,7 @@ export default function ShopClient({
             </div>
 
             {/* Active filters on mobile */}
-            {(selectedCategorySlug || searchTerm || currentMinPrice > 0 || currentMaxPrice < globalMaxPrice) && (
+            {(selectedCategorySlug || searchTerm || currentMinPrice > 0 || currentMaxPrice < globalMaxPrice || inStock || onSale || isNew || minRating > 0) && (
               <div className="flex flex-wrap gap-2 mb-4 lg:hidden">
                 {selectedCategorySlug && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full">
@@ -191,6 +205,38 @@ export default function ShopClient({
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full">
                     "{searchTerm}"
                     <button onClick={() => { setSearchTerm(''); updateFilter('search', ''); }} className="hover:text-white">
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {inStock && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
+                    Készleten
+                    <button onClick={() => updateFilter('inStock', '')} className="hover:text-white">
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {onSale && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 text-red-400 text-xs font-medium rounded-full">
+                    Akciós
+                    <button onClick={() => updateFilter('onSale', '')} className="hover:text-white">
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {isNew && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full">
+                    Új termék
+                    <button onClick={() => updateFilter('isNew', '')} className="hover:text-white">
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                {minRating > 0 && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">
+                    {minRating}+ ★
+                    <button onClick={() => updateFilter('minRating', 0)} className="hover:text-white">
                       <X size={12} />
                     </button>
                   </span>

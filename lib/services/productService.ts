@@ -34,13 +34,21 @@ export type GetProductsParams = {
   minPrice?: number
   maxPrice?: number
   isArchived?: boolean
+  inStock?: boolean
+  onSale?: boolean
+  isNew?: boolean
+  minRating?: number
 }
 
 export async function getProductsService(params: GetProductsParams) {
-  const { page = 1, limit = 20, search, category, stock, sort, minPrice, maxPrice, isArchived } = params
+  const { page = 1, limit = 20, search, category, stock, sort, minPrice, maxPrice, isArchived, inStock, onSale, isNew, minRating } = params
   const skip = (page - 1) * limit
 
   const searchTerms = search ? search.trim().split(/\s+/).filter(t => t.length > 0) : []
+
+  // Calculate the date 30 days ago for "new products" filter
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
   const where: Prisma.ProductWhereInput = {
     AND: [
@@ -61,6 +69,17 @@ export async function getProductsService(params: GetProductsParams) {
       minPrice ? { price: { gte: minPrice } } : {},
       maxPrice ? { price: { lte: maxPrice } } : {},
       isArchived !== undefined ? { isArchived } : {},
+      // New filters
+      inStock ? { stock: { gt: 0 } } : {},
+      onSale ? { 
+        salePrice: { not: null },
+        OR: [
+          { saleEndDate: null },
+          { saleEndDate: { gte: new Date() } }
+        ]
+      } : {},
+      isNew ? { createdAt: { gte: thirtyDaysAgo } } : {},
+      minRating ? { rating: { gte: minRating } } : {},
     ],
   }
 

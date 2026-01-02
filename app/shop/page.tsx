@@ -23,6 +23,10 @@ export default async function ShopPage({
   const sort = typeof params.sort === 'string' ? params.sort : 'newest'
   const minPrice = params.minPrice ? Number(params.minPrice) : undefined
   const maxPrice = params.maxPrice ? Number(params.maxPrice) : undefined
+  const inStock = params.inStock === 'true'
+  const onSale = params.onSale === 'true'
+  const isNew = params.isNew === 'true'
+  const minRating = params.minRating ? Number(params.minRating) : undefined
 
   let currentCategory = null
   if (category) {
@@ -40,7 +44,11 @@ export default async function ShopPage({
       sort,
       minPrice,
       maxPrice,
-      isArchived: false
+      isArchived: false,
+      inStock,
+      onSale,
+      isNew,
+      minRating
     }),
     prisma.banner.findMany({
       where: { isActive: true, location: 'SHOP' },

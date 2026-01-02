@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, Filter, X } from 'lucide-react'
+import { Search, Filter, X, Star, Zap, Package, Sparkles, Check } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 type Props = {
@@ -20,6 +20,15 @@ type Props = {
   favoritesCount: number
   onReset: () => void
   categories?: { name: string; slug: string }[]
+  // New filters
+  inStock?: boolean
+  setInStock?: (value: boolean) => void
+  onSale?: boolean
+  setOnSale?: (value: boolean) => void
+  minRating?: number
+  setMinRating?: (value: number) => void
+  isNew?: boolean
+  setIsNew?: (value: boolean) => void
 }
 
 export default function FilterPanel({
@@ -39,9 +48,29 @@ export default function FilterPanel({
   favoritesCount,
   onReset,
   categories = [],
+  inStock,
+  setInStock,
+  onSale,
+  setOnSale,
+  minRating,
+  setMinRating,
+  isNew,
+  setIsNew,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false)
-  // Removed internal categories fetching
+  
+  // Count active filters
+  const activeFilterCount = [
+    category,
+    searchTerm,
+    minPrice > 0,
+    maxPrice < maxLimit,
+    showFavoritesOnly,
+    inStock,
+    onSale,
+    minRating && minRating > 0,
+    isNew,
+  ].filter(Boolean).length
 
 
   return (
@@ -54,8 +83,8 @@ export default function FilterPanel({
         >
           <Filter size={20} /> 
           <span>Szűrők</span>
-          {(category || searchTerm || minPrice > 0 || maxPrice < maxLimit || showFavoritesOnly) && (
-            <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">Aktív</span>
+          {activeFilterCount > 0 && (
+            <span className="px-2.5 py-0.5 bg-white/20 rounded-full text-sm font-bold">{activeFilterCount}</span>
           )}
         </button>
       </div>
@@ -84,7 +113,7 @@ export default function FilterPanel({
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto p-5 pb-24">
               <FilterContent 
-                {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories }} 
+                {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew }} 
               />
             </div>
             
@@ -104,7 +133,7 @@ export default function FilterPanel({
       {/* Desktop Filter Panel */}
       <div className="hidden lg:block bg-[#121212] p-6 rounded-3xl border border-white/5 space-y-8 shadow-xl sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
         <FilterContent 
-          {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories }} 
+          {...{ searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew }} 
         />
       </div>
     </>
@@ -128,10 +157,18 @@ type FilterContentProps = {
   favoritesCount: number
   onReset: () => void
   categories: { name: string; slug: string }[]
+  inStock?: boolean
+  setInStock?: (value: boolean) => void
+  onSale?: boolean
+  setOnSale?: (value: boolean) => void
+  minRating?: number
+  setMinRating?: (value: number) => void
+  isNew?: boolean
+  setIsNew?: (value: boolean) => void
 }
 
 function FilterContent({
-  searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories
+  searchTerm, setSearchTerm, category, setCategory, sort, setSort, minPrice, setMinPrice, maxPrice, setMaxPrice, maxLimit, showFavoritesOnly, toggleFavoritesOnly, favoritesCount, onReset, categories, inStock, setInStock, onSale, setOnSale, minRating, setMinRating, isNew, setIsNew
 }: FilterContentProps) {
   return (
     <div className="space-y-8">
@@ -262,6 +299,141 @@ function FilterContent({
           </div>
         </div>
       </div>
+
+      {/* Quick Filters */}
+      <div>
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Zap size={14} /> Gyors szűrők
+        </h3>
+        <div className="space-y-2">
+          {/* In Stock Toggle */}
+          {setInStock && (
+            <div 
+              className={`p-3 rounded-xl border transition-all cursor-pointer group ${
+                inStock 
+                  ? 'bg-green-500/10 border-green-500/30' 
+                  : 'bg-[#0a0a0a] border-white/5 hover:border-white/20'
+              }`}
+              onClick={() => setInStock(!inStock)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${inStock ? 'bg-green-500/20' : 'bg-white/5'}`}>
+                    <Package size={16} className={inStock ? 'text-green-400' : 'text-gray-500'} />
+                  </div>
+                  <div>
+                    <span className={`text-sm font-medium ${inStock ? 'text-green-400' : 'text-gray-300'}`}>Készleten</span>
+                    <p className="text-xs text-gray-500">Csak elérhető termékek</p>
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                  inStock ? 'bg-green-500 border-green-500' : 'border-white/20'
+                }`}>
+                  {inStock && <Check size={12} className="text-white" />}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* On Sale Toggle */}
+          {setOnSale && (
+            <div 
+              className={`p-3 rounded-xl border transition-all cursor-pointer group ${
+                onSale 
+                  ? 'bg-red-500/10 border-red-500/30' 
+                  : 'bg-[#0a0a0a] border-white/5 hover:border-white/20'
+              }`}
+              onClick={() => setOnSale(!onSale)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${onSale ? 'bg-red-500/20' : 'bg-white/5'}`}>
+                    <Zap size={16} className={onSale ? 'text-red-400' : 'text-gray-500'} />
+                  </div>
+                  <div>
+                    <span className={`text-sm font-medium ${onSale ? 'text-red-400' : 'text-gray-300'}`}>Akciós</span>
+                    <p className="text-xs text-gray-500">Leárazott termékek</p>
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                  onSale ? 'bg-red-500 border-red-500' : 'border-white/20'
+                }`}>
+                  {onSale && <Check size={12} className="text-white" />}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* New Products Toggle */}
+          {setIsNew && (
+            <div 
+              className={`p-3 rounded-xl border transition-all cursor-pointer group ${
+                isNew 
+                  ? 'bg-blue-500/10 border-blue-500/30' 
+                  : 'bg-[#0a0a0a] border-white/5 hover:border-white/20'
+              }`}
+              onClick={() => setIsNew(!isNew)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isNew ? 'bg-blue-500/20' : 'bg-white/5'}`}>
+                    <Sparkles size={16} className={isNew ? 'text-blue-400' : 'text-gray-500'} />
+                  </div>
+                  <div>
+                    <span className={`text-sm font-medium ${isNew ? 'text-blue-400' : 'text-gray-300'}`}>Új termék</span>
+                    <p className="text-xs text-gray-500">Elmúlt 30 nap</p>
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                  isNew ? 'bg-blue-500 border-blue-500' : 'border-white/20'
+                }`}>
+                  {isNew && <Check size={12} className="text-white" />}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Rating Filter */}
+      {setMinRating && (
+        <div>
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Star size={14} /> Minimum értékelés
+          </h3>
+          <div className="space-y-2">
+            {[4, 3, 2, 1].map((rating) => (
+              <div 
+                key={rating}
+                className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                  minRating === rating 
+                    ? 'bg-yellow-500/10 border-yellow-500/30' 
+                    : 'bg-[#0a0a0a] border-white/5 hover:border-white/20'
+                }`}
+                onClick={() => setMinRating(minRating === rating ? 0 : rating)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star 
+                        key={star} 
+                        size={16} 
+                        className={star <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'} 
+                      />
+                    ))}
+                    <span className="text-xs text-gray-500 ml-2">és több</span>
+                  </div>
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
+                    minRating === rating ? 'bg-yellow-500 border-yellow-500' : 'border-white/20'
+                  }`}>
+                    {minRating === rating && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <hr className="border-white/5" />
 
