@@ -368,6 +368,17 @@ model SettingAudit {
   @@index([key])
   @@index([author])
 }
+
+model SeoAudit {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  createdBy       String?  // email or job
+  totalProducts   Int
+  avgScore        Int
+  criticalCount   Int
+  payload         Json     // full report (product scores, issues, etc.)
+}
+
 model InventoryLog {
   id          String   @id @default(cuid())
   productId   Int
