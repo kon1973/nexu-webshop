@@ -99,6 +99,7 @@ model VerificationToken {
 model Product {
   id          Int      @id @default(autoincrement())
   name        String
+  slug        String?  @unique
   description String
   price       Int
   salePrice       Int?
@@ -113,6 +114,20 @@ model Product {
   fullDescription String?
   specifications Json?
   isArchived Boolean  @default(false)
+  
+  // SEO fields
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  canonicalUrl    String?
+  ogImage         String?
+  
+  // Additional SEO-friendly fields
+  gtin            String?  // Global Trade Item Number (barcode)
+  mpn             String?  // Manufacturer Part Number
+  sku             String?
+  // Optional product videos
+  videos          Json?    // Array of { url, title, description, thumbnail, uploadDate }
   
   brandId     String?
   brand       Brand?   @relation(fields: [brandId], references: [id])
@@ -290,15 +305,20 @@ model NewsletterSubscriber {
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
-  icon      String?
-  color     String?
-  description String? @db.Text
-  coupons     Coupon[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String   @unique
+  slug            String   @unique
+  icon            String?
+  color           String?
+  description     String?  @db.Text
+  // SEO fields
+  metaTitle       String?
+  metaDescription String?  @db.Text
+  metaKeywords    String?
+  ogImage         String?
+  coupons         Coupon[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Banner {
