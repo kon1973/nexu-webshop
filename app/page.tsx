@@ -8,6 +8,7 @@ import NewsletterSection from './components/NewsletterSection'
 import BrandMarquee from './components/BrandMarquee'
 import LatestNews from './components/LatestNews'
 import FlashSaleSection from './components/FlashSaleSection'
+import SmartRecommendations from './components/SmartRecommendations'
 import { getSettings, getBanners, getCategories, getFeaturedProducts, getNewArrivals, getPromoBanner, getLatestBlogPosts, getFlashSaleProducts } from '@/lib/cache'
 import { getImageUrl } from '@/lib/image'
 import { getSiteUrl } from '@/lib/site'
@@ -319,6 +320,13 @@ export default async function HomePage() {
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Smart Recommendations - Personalized or Trending */}
+      <section className="py-16 bg-[#0a0a0a]">
+        <div className="container mx-auto px-4">
+          <SmartRecommendations maxItems={4} />
         </div>
       </section>
 

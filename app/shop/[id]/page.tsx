@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import Breadcrumbs from '@/app/components/Breadcrumbs'
 import RelatedProducts from '@/app/components/RelatedProducts'
+import SmartRecommendations from '@/app/components/SmartRecommendations'
 import type { Metadata } from 'next'
 import { getSiteUrl } from '@/lib/site'
 import ProductDetailsClient from './ProductDetailsClient'
@@ -415,6 +416,12 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
           products={relatedProducts} 
           currentProductId={product.id}
           currentProductName={product.name}
+        />
+
+        <SmartRecommendations 
+          currentProductId={product.id}
+          currentCategory={product.category}
+          maxItems={4}
         />
 
         <RecentlyViewed />
