@@ -255,10 +255,14 @@ export default function AIDashboard() {
               <Bot size={20} className="text-purple-400" />
               AI Model Info
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mt-4">
               <div>
-                <p className="text-gray-400 text-xs">Model</p>
+                <p className="text-gray-400 text-xs">Chatbot Model</p>
                 <p className="text-white font-semibold">GPT-5 Mini</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs">Content Model</p>
+                <p className="text-white font-semibold">GPT-5.2</p>
               </div>
               <div>
                 <p className="text-gray-400 text-xs">Max Tokens</p>
@@ -284,7 +288,7 @@ export default function AIDashboard() {
         <div className="mt-4 pt-4 border-t border-white/10">
           <p className="text-gray-400 text-xs mb-2">Elérhető funkciók:</p>
           <div className="flex flex-wrap gap-2">
-            {['Termékkeresés', 'Termék részletek', 'Rendelés követés', 'Összehasonlítás', 'FAQ válaszok', 'Népszerű termékek', 'Kosárba helyezés'].map((tool) => (
+            {['Termékkeresés', 'Termék részletek', 'Rendelés követés', 'Összehasonlítás', 'FAQ válaszok', 'Népszerű termékek', 'Kosárba helyezés', 'Leírás generálás', 'SEO optimalizálás', 'Képkeresés'].map((tool) => (
               <span key={tool} className="px-2 py-1 bg-white/5 rounded text-xs text-gray-300">
                 {tool}
               </span>
