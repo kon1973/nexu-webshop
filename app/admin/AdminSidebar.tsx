@@ -21,7 +21,8 @@ import {
   Sliders,
   Star,
   ClipboardList,
-  Search
+  Search,
+  Bot
 } from 'lucide-react'
 import { useState } from 'react'
 import { signOut } from 'next-auth/react'
@@ -36,6 +37,7 @@ const menuItems = [
   { name: 'Hírlevél', href: '/admin/newsletter', icon: Mail },
   { name: 'Kimutatások', href: '/admin/reports', icon: ClipboardList },
   { name: 'Analitika', href: '/admin/analytics', icon: BarChart3 },
+  { name: 'AI Dashboard', href: '/admin/ai-dashboard', icon: Bot },
   { name: 'Blog', href: '/admin/blog', icon: FileText },
   { name: 'Kategóriák', href: '/admin/categories', icon: Tag },
   { name: 'Bannerek', href: '/admin/banners', icon: ImageIcon },
