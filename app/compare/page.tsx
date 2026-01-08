@@ -5,10 +5,11 @@ import { useCompare } from '@/context/CompareContext'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Trash2, ShoppingCart, X, ArrowLeft, Check, Package, Star, Plus, Loader2 } from 'lucide-react'
+import { Trash2, ShoppingCart, X, ArrowLeft, Check, Package, Star, Plus, Loader2, Sparkles } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getImageUrl } from '@/lib/image'
 import { getCompareProducts, getSimilarProducts, type CompareProduct } from './actions'
+import AICompare from '@/app/components/AICompare'
 
 type SimilarProduct = {
   id: number
@@ -26,6 +27,7 @@ export default function ComparePage() {
   const [similarProducts, setSimilarProducts] = useState<SimilarProduct[]>([])
   const [isPending, startTransition] = useTransition()
   const [isLoading, setIsLoading] = useState(true)
+  const [showAICompare, setShowAICompare] = useState(false)
 
   // Fetch full product data when compare list changes
   useEffect(() => {
@@ -131,6 +133,19 @@ export default function ComparePage() {
           <p className="text-gray-400 mt-1">{products.length} termék összehasonlítása</p>
         </div>
         <div className="flex items-center gap-3">
+          {products.length >= 2 && (
+            <button
+              onClick={() => setShowAICompare(!showAICompare)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                showAICompare 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400'
+              }`}
+            >
+              <Sparkles size={18} />
+              AI Elemzés
+            </button>
+          )}
           <Link
             href="/shop"
             className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
@@ -147,6 +162,34 @@ export default function ComparePage() {
           </button>
         </div>
       </motion.div>
+
+      {/* AI Comparison Section */}
+      <AnimatePresence>
+        {showAICompare && products.length >= 2 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-8 overflow-hidden"
+          >
+            <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/20 rounded-2xl p-6">
+              <AICompare 
+                products={products.map(p => ({
+                  id: p.id,
+                  name: p.name,
+                  slug: String(p.id),
+                  price: p.price,
+                  image: p.image,
+                  category: p.category,
+                  brand: p.brand ? { name: p.brand } : null,
+                  description: null
+                }))}
+                onRemove={removeFromCompare}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Loading overlay */}
       <AnimatePresence>

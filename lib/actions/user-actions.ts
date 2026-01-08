@@ -1113,3 +1113,231 @@ export async function generateReviewHelper(productId: number, rating: number) {
     return { success: false, error: 'Hiba történt' }
   }
 }
+
+/**
+ * AI Wishlist Analyzer - kompletes kedvencek elemzés
+ * Személyre szabott ajánlások, áresés figyelés, csomagajánlatok
+ */
+export async function analyzeWishlist(productIds: number[]) {
+  try {
+    if (productIds.length < 2) {
+      return { success: false, error: 'Legalább 2 termék szükséges az elemzéshez' }
+    }
+
+    // Fetch wishlist products with details
+    const wishlistProducts = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        salePrice: true,
+        salePercentage: true,
+        category: true,
+        brandId: true,
+        brand: { select: { name: true } },
+        image: true,
+        slug: true,
+        stock: true,
+        specifications: true
+      }
+    })
+
+    if (wishlistProducts.length === 0) {
+      return { success: false, error: 'Nem találhatók a termékek' }
+    }
+
+    // Calculate insights
+    const prices = wishlistProducts.map(p => p.salePrice || p.price)
+    const totalValue = prices.reduce((a, b) => a + b, 0)
+    const averagePrice = Math.round(totalValue / prices.length)
+    
+    // Group by category
+    const categoryMap = new Map<string, number>()
+    wishlistProducts.forEach(p => {
+      const cat = p.category || 'Egyéb'
+      categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1)
+    })
+    const categories = Array.from(categoryMap.entries()).map(([name, count]) => ({ name, count }))
+
+    // Price range
+    const priceRange = {
+      min: Math.min(...prices),
+      max: Math.max(...prices)
+    }
+
+    // Check for price drops (compare salePrice to price - salePrice means it's on sale)
+    const priceDropAlerts: Array<{
+      productId: number
+      productName: string
+      currentPrice: number
+      previousPrice: number
+      percentageDrop: number
+    }> = []
+    
+    wishlistProducts.forEach(product => {
+      if (product.salePrice && product.salePrice < product.price) {
+        const percentageDrop = Math.round((1 - product.salePrice / product.price) * 100)
+        if (percentageDrop >= 5) {
+          priceDropAlerts.push({
+            productId: product.id,
+            productName: product.name,
+            currentPrice: product.salePrice,
+            previousPrice: product.price,
+            percentageDrop
+          })
+        }
+      }
+    })
+
+    // Calculate potential savings
+    let savingsOpportunity = 0
+    priceDropAlerts.forEach(alert => {
+      savingsOpportunity += alert.previousPrice - alert.currentPrice
+    })
+
+    // Find similar/complementary products for recommendations
+    const categoryNames = Array.from(categoryMap.keys())
+    const brandIds = wishlistProducts.map(p => p.brandId).filter(Boolean) as string[]
+    
+    const recommendedProducts = await prisma.product.findMany({
+      where: {
+        AND: [
+          { id: { notIn: productIds } },
+          { stock: { gt: 0 } },
+          {
+            OR: [
+              { category: { in: categoryNames } },
+              ...(brandIds.length > 0 ? [{ brandId: { in: brandIds } }] : [])
+            ]
+          }
+        ]
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        salePrice: true,
+        image: true,
+        category: true,
+        brandId: true,
+        brand: { select: { name: true } }
+      },
+      orderBy: [
+        { salePrice: 'asc' },
+        { rating: 'desc' }
+      ],
+      take: 6
+    })
+
+    // Use AI to generate personalized recommendations and bundle suggestions
+    let aiMessage = ''
+    let bundleSuggestions: Array<{
+      products: Array<{ id: number; name: string; price: number }>
+      totalPrice: number
+      savings: number
+      reason: string
+    }> = []
+
+    try {
+      const wishlistSummary = wishlistProducts.map(p => `${p.name} (${p.category}, ${p.price} Ft)`).join(', ')
+      
+      const response = await openai.chat.completions.create({
+        model: 'gpt-5-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `Te egy shopping asszisztens vagy. Elemezd a felhasználó kedvenceit és adj személyre szabott tanácsot.
+            Válaszolj JSON formátumban:
+            {
+              "message": "Rövid, személyes üzenet a kedvencekről (max 100 karakter)",
+              "bundleIdea": "Egy kreatív csomagötlet neve, ha releváns",
+              "bundleReason": "Miért jó ez a csomag (max 50 karakter)"
+            }`
+          },
+          {
+            role: 'user',
+            content: `Kedvencek: ${wishlistSummary}\nKategóriák: ${categoryNames.join(', ')}\nÁtlagár: ${averagePrice} Ft`
+          }
+        ],
+        max_tokens: 200,
+        temperature: 0.7
+      })
+
+      const aiContent = response.choices[0]?.message?.content
+      if (aiContent) {
+        try {
+          const parsed = JSON.parse(aiContent)
+          aiMessage = parsed.message || ''
+          
+          // Create bundle suggestion if AI provided one
+          if (parsed.bundleIdea && wishlistProducts.length >= 2) {
+            const bundleProducts = wishlistProducts.slice(0, 3).map(p => ({
+              id: p.id,
+              name: p.name,
+              price: p.salePrice || p.price
+            }))
+            const bundleTotal = bundleProducts.reduce((sum, p) => sum + p.price, 0)
+            bundleSuggestions.push({
+              products: bundleProducts,
+              totalPrice: bundleTotal,
+              savings: Math.round(bundleTotal * 0.05), // 5% bundle discount idea
+              reason: parsed.bundleReason || 'Tökéletes kombináció'
+            })
+          }
+        } catch {
+          // Use raw message if not JSON
+          aiMessage = aiContent.substring(0, 100)
+        }
+      }
+    } catch (aiError) {
+      console.error('AI wishlist analysis error:', aiError)
+      aiMessage = 'Remek választások a kedvenceid között!'
+    }
+
+    // Format recommendations with reasons
+    const recommendations = recommendedProducts.map(product => {
+      let reason = ''
+      const brandName = product.brand?.name
+      if (wishlistProducts.some(wp => wp.category === product.category)) {
+        reason = `Hasonló a kedvenceidhez`
+      } else if (brandName && wishlistProducts.some(wp => wp.brand?.name === brandName)) {
+        reason = `${brandName} termék, amit szeretsz`
+      } else if (product.salePrice && product.salePrice < product.price) {
+        reason = 'Most akciós!'
+      } else {
+        reason = 'Ajánlott neked'
+      }
+
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug || String(product.id),
+        price: product.salePrice || product.price,
+        originalPrice: product.salePrice ? product.price : null,
+        image: product.image,
+        category: product.category,
+        reason
+      }
+    })
+
+    return {
+      success: true,
+      insights: {
+        totalValue,
+        averagePrice,
+        categories,
+        priceRange,
+        savingsOpportunity
+      },
+      recommendations,
+      priceDropAlerts,
+      bundleSuggestions,
+      aiMessage
+    }
+  } catch (error) {
+    console.error('Wishlist analysis error:', error)
+    return { success: false, error: 'Hiba történt az elemzés során' }
+  }
+}

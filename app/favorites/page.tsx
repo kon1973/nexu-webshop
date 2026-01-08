@@ -7,6 +7,7 @@ import { useState, useEffect, useTransition } from 'react'
 import { ArrowLeft, HeartCrack, ShoppingCart, AlertTriangle, Tag, Sparkles, TrendingDown, Loader2, Share2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ProductCard from '@/app/components/ProductCard'
+import AIWishlistAnalyzer from '@/app/components/AIWishlistAnalyzer'
 import { toast } from 'sonner'
 import { getRecommendationsForFavorites, checkFavoritesStock, checkPriceDrops, getPopularCategories } from './actions'
 import type { Product } from '@prisma/client'
@@ -269,6 +270,23 @@ export default function FavoritesPage() {
                   )
                 })}
               </AnimatePresence>
+            </motion.div>
+
+            {/* AI Wishlist Analyzer */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="mt-12"
+            >
+              <AIWishlistAnalyzer 
+                products={favorites.map(f => ({
+                  id: f.id,
+                  name: f.name,
+                  price: f.salePrice || f.price,
+                  image: f.image || null
+                }))}
+              />
             </motion.div>
 
             {/* Recommendations */}
