@@ -429,4 +429,38 @@ model Brand {
   updatedAt   DateTime @updatedAt
 }
 
+// AI Chatbot Analytics
+model ChatSession {
+  id              String    @id @default(cuid())
+  sessionId       String    @unique // Browser session identifier
+  userId          String?   // Optional - logged in user
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  messageCount    Int       @default(0)
+  // Aggregated metrics
+  productSearches Int       @default(0)
+  orderLookups    Int       @default(0)
+  cartAdditions   Int       @default(0)
+  converted       Boolean   @default(false) // Did session lead to purchase?
+  
+  messages        ChatMessage[]
+  
+  @@index([startedAt])
+  @@index([userId])
+}
 
+model ChatMessage {
+  id            String      @id @default(cuid())
+  sessionId     String
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role          String      // 'user' or 'assistant'
+  content       String      @db.Text
+  // Analytics
+  intent        String?     // Detected intent: product_search, order_lookup, general, etc.
+  productIds    Int[]       // Products mentioned/searched
+  createdAt     DateTime    @default(now())
+  
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([intent])
+}

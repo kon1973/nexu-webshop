@@ -8,6 +8,126 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+// ============== SESSION TRACKING ==============
+
+// Detect user intent from message
+function detectIntent(message: string): string | null {
+  const lowerMsg = message.toLowerCase()
+  
+  if (lowerMsg.includes('rendelés') || lowerMsg.includes('csomag') || lowerMsg.includes('szállítás státusz')) {
+    return 'order_lookup'
+  }
+  if (lowerMsg.includes('keres') || lowerMsg.includes('van-e') || lowerMsg.includes('termék') || 
+      lowerMsg.includes('telefon') || lowerMsg.includes('laptop') || lowerMsg.includes('fülhallgató')) {
+    return 'product_search'
+  }
+  if (lowerMsg.includes('összehasonlít') || lowerMsg.includes('melyik jobb') || lowerMsg.includes('különbség')) {
+    return 'product_compare'
+  }
+  if (lowerMsg.includes('kosár') || lowerMsg.includes('hozzáad') || lowerMsg.includes('vásárol')) {
+    return 'cart_intent'
+  }
+  if (lowerMsg.includes('garancia') || lowerMsg.includes('visszaküld') || lowerMsg.includes('csere')) {
+    return 'support'
+  }
+  if (lowerMsg.includes('akció') || lowerMsg.includes('kedvezmény') || lowerMsg.includes('leárazás')) {
+    return 'deals'
+  }
+  if (lowerMsg.includes('szállítás') || lowerMsg.includes('átvétel') || lowerMsg.includes('kiszállítás')) {
+    return 'shipping_info'
+  }
+  if (lowerMsg.includes('fizetés') || lowerMsg.includes('bankkártya') || lowerMsg.includes('utánvét')) {
+    return 'payment_info'
+  }
+  
+  return 'general'
+}
+
+// Get or create chat session
+async function getOrCreateSession(sessionId: string, userId?: string | null) {
+  // Check if session exists (within last 30 minutes)
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+  
+  let session = await prisma.chatSession.findFirst({
+    where: {
+      sessionId,
+      startedAt: { gte: thirtyMinutesAgo },
+      endedAt: null
+    }
+  })
+
+  if (!session) {
+    session = await prisma.chatSession.create({
+      data: {
+        sessionId,
+        userId: userId || null,
+      }
+    })
+  }
+
+  return session
+}
+
+// Save chat message
+async function saveChatMessage(
+  sessionId: string, 
+  role: 'user' | 'assistant', 
+  content: string, 
+  intent?: string | null,
+  productIds?: number[]
+) {
+  return prisma.chatMessage.create({
+    data: {
+      sessionId,
+      role,
+      content,
+      intent,
+      productIds: productIds || []
+    }
+  })
+}
+
+// Update session metrics
+async function updateSessionMetrics(
+  sessionDbId: string,
+  metrics: {
+    productSearches?: number
+    orderLookups?: number
+    cartAdditions?: number
+    converted?: boolean
+  }
+) {
+  const updateData: any = {}
+  
+  if (metrics.productSearches) {
+    updateData.productSearches = { increment: metrics.productSearches }
+  }
+  if (metrics.orderLookups) {
+    updateData.orderLookups = { increment: metrics.orderLookups }
+  }
+  if (metrics.cartAdditions) {
+    updateData.cartAdditions = { increment: metrics.cartAdditions }
+  }
+  if (metrics.converted !== undefined) {
+    updateData.converted = metrics.converted
+  }
+
+  if (Object.keys(updateData).length > 0) {
+    await prisma.chatSession.update({
+      where: { id: sessionDbId },
+      data: updateData
+    })
+  }
+}
+
+// Increment message count
+async function incrementMessageCount(sessionDbId: string) {
+  await prisma.chatSession.update({
+    where: { id: sessionDbId },
+    data: { messageCount: { increment: 1 } }
+  })
+}
+
 // ============== TOOL FUNCTIONS ==============
 
 // Search products in database
@@ -747,10 +867,22 @@ Kínáld fel a segítséget: termékkeresés, rendelés követés, vagy kérdés
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages } = await request.json()
+    const { messages, sessionId: clientSessionId, userId } = await request.json()
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    }
+
+    // Generate or use provided session ID
+    const sessionId = clientSessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+    // Get or create chat session for analytics
+    let chatSession = null
+    try {
+      chatSession = await getOrCreateSession(sessionId, userId)
+    } catch (e) {
+      // Don't fail the chat if analytics fails
+      console.error('Session tracking error:', e)
     }
 
     const formattedMessages = messages
@@ -760,13 +892,55 @@ export async function POST(request: NextRequest) {
         content: m.content
       }))
 
+    // Get the last user message for analytics
+    const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()
+    const userIntent = lastUserMessage ? detectIntent(lastUserMessage.content) : null
+
+    // Save user message to database
+    if (chatSession && lastUserMessage) {
+      try {
+        await saveChatMessage(chatSession.id, 'user', lastUserMessage.content, userIntent)
+        await incrementMessageCount(chatSession.id)
+      } catch (e) {
+        console.error('Message save error:', e)
+      }
+    }
+
     const result = await processChat(formattedMessages)
+
+    // Extract product IDs from results
+    const productIds = result.products?.map((p: any) => p.id) || []
+
+    // Save assistant response
+    if (chatSession && result.content) {
+      try {
+        await saveChatMessage(chatSession.id, 'assistant', result.content, null, productIds)
+        await incrementMessageCount(chatSession.id)
+
+        // Update session metrics based on results
+        const metrics: any = {}
+        if (result.products && result.products.length > 0) {
+          metrics.productSearches = 1
+        }
+        if (result.orderInfo) {
+          metrics.orderLookups = 1
+        }
+        if (result.cartAction?.success) {
+          metrics.cartAdditions = 1
+          metrics.converted = true
+        }
+        await updateSessionMetrics(chatSession.id, metrics)
+      } catch (e) {
+        console.error('Response save error:', e)
+      }
+    }
 
     return NextResponse.json({
       content: result.content,
       products: result.products,
       cartAction: result.cartAction,
-      orderInfo: result.orderInfo
+      orderInfo: result.orderInfo,
+      sessionId // Return session ID for client to reuse
     })
   } catch (error) {
     console.error('Chat API error:', error)

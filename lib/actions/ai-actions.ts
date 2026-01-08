@@ -716,37 +716,102 @@ export async function getAIStats(range: '7d' | '30d' | '90d' = '7d') {
     const days = range === '90d' ? 90 : range === '30d' ? 30 : 7
     const startDate = startOfDay(subDays(new Date(), days))
 
-    // Generate realistic mock data based on range
-    const baseConversations = days === 7 ? 150 : days === 30 ? 600 : 1800
-    const variance = Math.random() * 0.2 - 0.1
+    // Query real chat session data
+    const sessions = await prisma.chatSession.findMany({
+      where: {
+        startedAt: { gte: startDate }
+      },
+      include: {
+        messages: true
+      }
+    })
 
-    const stats = {
-      totalConversations: Math.round(baseConversations * (1 + variance)),
-      totalMessages: Math.round(baseConversations * 7.2 * (1 + variance)),
-      avgMessagesPerConversation: 7.2 + Math.random() * 0.5,
-      topQueries: [
-        { query: 'telefon', count: Math.round(50 + Math.random() * 20) * (days / 7) },
-        { query: 'laptop', count: Math.round(35 + Math.random() * 15) * (days / 7) },
-        { query: 'szállítás', count: Math.round(25 + Math.random() * 10) * (days / 7) },
-        { query: 'rendelés', count: Math.round(20 + Math.random() * 10) * (days / 7) },
-        { query: 'gaming', count: Math.round(18 + Math.random() * 8) * (days / 7) }
-      ].map(q => ({ ...q, count: Math.round(q.count) })),
-      productSearches: Math.round(baseConversations * 1.8 * (1 + variance)),
-      orderLookups: Math.round(baseConversations * 0.4 * (1 + variance)),
-      cartAdditions: Math.round(baseConversations * 0.3 * (1 + variance)),
-      conversionRate: 15 + Math.random() * 5
+    // Calculate aggregate stats
+    const totalConversations = sessions.length
+    const totalMessages = sessions.reduce((sum, s) => sum + s.messageCount, 0)
+    const avgMessagesPerConversation = totalConversations > 0 
+      ? Math.round((totalMessages / totalConversations) * 10) / 10 
+      : 0
+    const productSearches = sessions.reduce((sum, s) => sum + s.productSearches, 0)
+    const orderLookups = sessions.reduce((sum, s) => sum + s.orderLookups, 0)
+    const cartAdditions = sessions.reduce((sum, s) => sum + s.cartAdditions, 0)
+    const convertedSessions = sessions.filter(s => s.converted).length
+    const conversionRate = totalConversations > 0 
+      ? Math.round((convertedSessions / totalConversations) * 1000) / 10 
+      : 0
+
+    // Calculate top queries from user messages
+    const allUserMessages = sessions.flatMap(s => 
+      s.messages.filter(m => m.role === 'user')
+    )
+    
+    // Group by intent
+    const intentCounts: Record<string, number> = {}
+    for (const msg of allUserMessages) {
+      if (msg.intent) {
+        intentCounts[msg.intent] = (intentCounts[msg.intent] || 0) + 1
+      }
     }
 
-    // Generate daily stats
-    const dailyStats = []
+    // Extract keywords from user messages for top queries
+    const keywordCounts: Record<string, number> = {}
+    const keywords = ['telefon', 'laptop', 'szállítás', 'rendelés', 'gaming', 'iphone', 'samsung', 
+                      'fülhallgató', 'tablet', 'kamera', 'monitor', 'billentyűzet', 'egér', 'akció']
+    
+    for (const msg of allUserMessages) {
+      const lowerContent = msg.content.toLowerCase()
+      for (const keyword of keywords) {
+        if (lowerContent.includes(keyword)) {
+          keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1
+        }
+      }
+    }
+
+    const topQueries = Object.entries(keywordCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([query, count]) => ({ query, count }))
+
+    // If no real queries yet, show empty or hint
+    if (topQueries.length === 0) {
+      topQueries.push({ query: 'Még nincs adat', count: 0 })
+    }
+
+    // Calculate daily stats
+    const dailyStatsMap: Record<string, { conversations: number; messages: number }> = {}
+    
+    // Initialize all days
     for (let i = days - 1; i >= 0; i--) {
-      const date = subDays(new Date(), i)
-      const dayVariance = Math.random() * 0.4 - 0.2
-      dailyStats.push({
-        date: format(date, 'yyyy-MM-dd'),
-        conversations: Math.round((baseConversations / days) * (1 + dayVariance)),
-        messages: Math.round((baseConversations * 7.2 / days) * (1 + dayVariance))
-      })
+      const date = format(subDays(new Date(), i), 'yyyy-MM-dd')
+      dailyStatsMap[date] = { conversations: 0, messages: 0 }
+    }
+
+    // Aggregate session data by day
+    for (const session of sessions) {
+      const date = format(session.startedAt, 'yyyy-MM-dd')
+      if (dailyStatsMap[date]) {
+        dailyStatsMap[date].conversations++
+        dailyStatsMap[date].messages += session.messageCount
+      }
+    }
+
+    const dailyStats = Object.entries(dailyStatsMap)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, data]) => ({
+        date,
+        conversations: data.conversations,
+        messages: data.messages
+      }))
+
+    const stats = {
+      totalConversations,
+      totalMessages,
+      avgMessagesPerConversation,
+      topQueries,
+      productSearches,
+      orderLookups,
+      cartAdditions,
+      conversionRate
     }
 
     return {
