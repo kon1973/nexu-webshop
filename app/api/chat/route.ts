@@ -96,7 +96,7 @@ Válaszolj röviden és lényegre törően!`
 
   // Call OpenAI with function calling
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-mini',
     messages: [systemMessage, ...messages],
     functions: [
       {
@@ -157,7 +157,7 @@ Válaszolj röviden és lényegre törően!`
       }
 
       const finalResponse = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         messages: [
           systemMessage,
           ...messages,

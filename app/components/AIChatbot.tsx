@@ -240,7 +240,7 @@ export default function AIChatbot() {
                   <h3 className="font-bold text-white text-sm">NEXU AI Asszisztens</h3>
                   <p className="text-xs text-green-400 flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    Online • GPT-4o
+                    Online • GPT-5 Mini
                   </p>
                 </div>
               </div>
