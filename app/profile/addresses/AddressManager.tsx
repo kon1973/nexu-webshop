@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { MapPin, Plus, Trash2, Edit2, Check, X, ArrowLeft, Home, Building2 } from 'lucide-react'
 import Link from 'next/link'
 import { createAddress, updateAddress, deleteAddress } from '../actions'
+import ProfileSidebar from '../ProfileSidebar'
 
 interface Address {
   id: string
@@ -143,22 +144,37 @@ export default function AddressManager({ initialAddresses }: { initialAddresses:
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pt-20 md:pt-24 pb-12 font-sans selection:bg-purple-500/30">
-      <div className="container mx-auto px-4 max-w-4xl">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link 
-            href="/profile" 
-            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
-          >
-            <ArrowLeft size={20} />
-          </Link>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-              <MapPin className="text-purple-400" /> Címjegyzék
-            </h1>
-            <p className="text-gray-400 text-sm">{addresses.length} mentett cím</p>
-          </div>
-        </div>
+      <div className="container mx-auto px-4 max-w-6xl">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+          {/* Sidebar - hidden on mobile */}
+          <aside className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-24">
+              <div className="bg-[#121212] border border-white/5 rounded-2xl p-4">
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 px-4">
+                  Fiókom
+                </h2>
+                <ProfileSidebar />
+              </div>
+            </div>
+          </aside>
+          
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-8">
+              <Link 
+                href="/profile" 
+                className="lg:hidden w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+              >
+                <ArrowLeft size={20} />
+              </Link>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+                  <MapPin className="text-purple-400" /> Címjegyzék
+                </h1>
+                <p className="text-gray-400 text-sm">{addresses.length} mentett cím</p>
+              </div>
+            </div>
 
         {!isAdding && (
           <div className="space-y-6 mb-8">
@@ -501,6 +517,8 @@ export default function AddressManager({ initialAddresses }: { initialAddresses:
               </button>
             </div>
           )}
+        </div>
+          </div>
         </div>
       </div>
     </div>

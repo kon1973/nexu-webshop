@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Navbar from './Navbar'
@@ -9,8 +9,10 @@ import Footer from './components/Footer'
 import ScrollToTop from './components/ScrollToTop'
 import CookieBanner from './components/CookieBanner'
 import SkipToContent from './components/Accessibility'
+import { PWAProvider } from './components/PWAProvider'
 import { getSiteUrl } from '@/lib/site'
 import { getSettings, getCategories } from '@/lib/cache'
+import OrganizationJsonLd from './components/OrganizationJsonLd'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -18,6 +20,20 @@ const inter = Inter({
   preload: true,
 })
 const siteUrl = getSiteUrl()
+const siteUrlString = typeof siteUrl === 'string' ? siteUrl : siteUrl.toString()
+
+// Viewport configuration for PWA
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#0a0a0a' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: 'cover',
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings()
@@ -45,6 +61,15 @@ export async function generateMetadata(): Promise<Metadata> {
       title: siteName,
       description: description,
     },
+    manifest: '/manifest.json',
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: siteName,
+    },
+    formatDetection: {
+      telephone: false,
+    },
   }
 }
 
@@ -55,24 +80,44 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="hu" suppressHydrationWarning>
       <head>
+        {/* Language and region targeting */}
+        <link rel="alternate" hrefLang="hu" href={siteUrlString} />
+        <link rel="alternate" hrefLang="x-default" href={siteUrlString} />
         {/* Preconnect to critical third-party origins */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* Preconnect to image CDNs and storage */}
+        <link rel="preconnect" href="https://res.cloudinary.com" />
+        <link rel="preconnect" href="https://images.unsplash.com" />
         {/* DNS prefetch for analytics and payment providers */}
         <link rel="dns-prefetch" href="https://js.stripe.com" />
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+        <link rel="dns-prefetch" href="https://connect.facebook.net" />
         {/* Prefetch critical navigation routes */}
         <link rel="prefetch" href="/shop" as="document" />
+        {/* PWA Apple Touch Icon */}
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.svg" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.svg" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.svg" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-152x152.svg" />
+        {/* Favicon */}
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        {/* Theme color for mobile browsers */}
+        <meta name="theme-color" content="#0a0a0a" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className={`${inter.className} bg-[#0a0a0a] text-white`}>
         <Providers settings={settings}>
-          <SkipToContent />
-          <Navbar categories={categories} />
-          <CartSidebar />
-          <main id="main-content">{children}</main>
-          <Footer settings={settings} />
-          <ScrollToTop />
-          <Toaster 
+          <PWAProvider>
+            <SkipToContent />
+            <OrganizationJsonLd settings={settings} />
+            <Navbar categories={categories} />
+            <CartSidebar />
+            <main id="main-content">{children}</main>
+            <Footer settings={settings} />
+            <ScrollToTop />
+            <Toaster 
             position="bottom-right" 
             theme="dark"
             toastOptions={{
@@ -98,6 +143,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             closeButton
           />
           <CookieBanner />
+          </PWAProvider>
         </Providers>
       </body>
     </html>

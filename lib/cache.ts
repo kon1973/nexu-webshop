@@ -119,3 +119,29 @@ export const getLatestReviews = unstable_cache(
   ['latest-reviews'],
   { revalidate: 3600 }
 )
+
+export const getFlashSaleProducts = unstable_cache(
+  async () => {
+    const now = new Date()
+    return await prisma.product.findMany({
+      where: {
+        isArchived: false,
+        salePrice: { not: null },
+        saleEndDate: { gt: now },
+        OR: [
+          { saleStartDate: null },
+          { saleStartDate: { lte: now } }
+        ]
+      },
+      take: 12,
+      orderBy: { saleEndDate: 'asc' },
+      include: {
+        variants: {
+          select: { id: true }
+        }
+      }
+    })
+  },
+  ['flash-sale-products'],
+  { tags: [CACHE_TAGS.products], revalidate: 300 } // Revalidate every 5 minutes
+)

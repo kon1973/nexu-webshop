@@ -9,7 +9,10 @@ import { ProductImages } from '../components/product-form/ProductImages'
 import { ProductVariants } from '../components/product-form/ProductVariants'
 import { ProductSpecifications } from '../components/product-form/ProductSpecifications'
 import { ProductDescriptions } from '../components/product-form/ProductDescriptions'
+import ProductVideos from '../components/product-form/ProductVideos'
+import { ProductSEO } from '../components/product-form/ProductSEO'
 import { createProductAction } from '../products/actions'
+import { generateVariantSlug } from '@/lib/seo-utils'
 
 type Attribute = {
   id: string
@@ -27,6 +30,7 @@ type Variant = {
   saleEndDate?: string | null
   stock: number
   sku?: string
+  slug?: string
   image?: string
   description?: string
   isActive: boolean
@@ -90,6 +94,18 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
   // Specifications state
   const [specTemplates, setSpecTemplates] = useState<SpecTemplate[]>(initialSpecTemplates)
   const [specifications, setSpecifications] = useState<{ key: string, value: string | boolean, type: 'text' | 'boolean' | 'header' }[]>([])
+
+  // Videos state
+  const [videos, setVideos] = useState<{ url: string; title?: string; description?: string; thumbnail?: string; uploadDate?: string }[]>([])
+
+  // SEO state
+  const [metaTitle, setMetaTitle] = useState('')
+  const [metaDescription, setMetaDescription] = useState('')
+  const [metaKeywords, setMetaKeywords] = useState('')
+  const [slug, setSlug] = useState('')
+  const [gtin, setGtin] = useState('')
+  const [mpn, setMpn] = useState('')
+  const [productSku, setProductSku] = useState('')
 
   // Removed useEffect fetching
 
@@ -177,6 +193,7 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
       price: basePrice || 0,
       stock: baseStock || 0,
       sku: '',
+      slug: generateVariantSlug(combo), // Auto-generate SEO slug
       image: images[0] || '',
       description: '',
       isActive: true
@@ -256,6 +273,7 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
       fullDescription: formData.get('fullDescription') as string,
       image: images[0] || '\u{1f4e6}',
       images: images,
+      videos: videos.length > 0 ? videos : undefined,
       isArchived: isArchived,
       brandId: brandId || null,
       specifications: specifications.filter(s => s.key && (s.type === 'header' || s.value !== '')),
@@ -264,11 +282,20 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
         price: Number(v.price),
         stock: Number(v.stock),
         sku: v.sku,
+        slug: v.slug || generateVariantSlug(v.attributes), // Ensure slug is set
         image: v.image,
         description: v.description,
         isActive: v.isActive
       })),
-      options: []
+      options: [],
+      // SEO fields
+      slug: slug || null,
+      metaTitle: metaTitle || null,
+      metaDescription: metaDescription || null,
+      metaKeywords: metaKeywords || null,
+      gtin: gtin || null,
+      mpn: mpn || null,
+      sku: productSku || null,
     }
 
     try {
@@ -360,6 +387,27 @@ export default function AddProductForm({ initialCategories, initialAttributes, i
               addSpecRow={addSpecRow}
               removeSpecRow={removeSpecRow}
               updateSpec={updateSpec}
+            />
+
+            <ProductVideos videos={videos} setVideos={setVideos} />
+
+            <ProductSEO
+              name={name}
+              description={description}
+              metaTitle={metaTitle}
+              setMetaTitle={setMetaTitle}
+              metaDescription={metaDescription}
+              setMetaDescription={setMetaDescription}
+              metaKeywords={metaKeywords}
+              setMetaKeywords={setMetaKeywords}
+              slug={slug}
+              setSlug={setSlug}
+              gtin={gtin}
+              setGtin={setGtin}
+              mpn={mpn}
+              setMpn={setMpn}
+              productSku={productSku}
+              setProductSku={setProductSku}
             />
 
             <button

@@ -1,14 +1,42 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { getSiteUrl } from '@/lib/site'
+
+const siteUrl = getSiteUrl()
 
 export const metadata: Metadata = {
-  title: 'Adatvédelmi Tájékoztató',
-  description: 'A NEXU Webshop adatvédelmi és cookie szabályzata.',
+  title: 'Adatvédelmi Tájékoztató (GDPR)',
+  description: 'A NEXU Webshop adatvédelmi és cookie szabályzata. GDPR megfelelőség, adatkezelési eljárások és felhasználói jogok.',
+  alternates: { canonical: `${siteUrl}/privacy` },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: 'Adatvédelmi Tájékoztató | NEXU Webshop',
+    description: 'A NEXU Webshop adatvédelmi és cookie szabályzata. GDPR megfelelőség és felhasználói jogok.',
+    url: `${siteUrl}/privacy`,
+    siteName: 'NEXU Webshop',
+    locale: 'hu_HU',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Adatvédelmi Tájékoztató | NEXU Webshop',
+    description: 'A NEXU Webshop adatvédelmi és cookie szabályzata.',
+  },
 }
 
 export default function PrivacyPage() {
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Kezdőlap', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Adatvédelmi Tájékoztató', item: `${siteUrl}/privacy` }
+    ]
+  }
+
   return (
     <div className="container mx-auto px-4 pt-32 pb-12 text-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <h1 className="text-4xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
         Adatvédelmi Tájékoztató
       </h1>

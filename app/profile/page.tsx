@@ -230,6 +230,40 @@ export default async function ProfilePage() {
           </div>
         </div>
 
+        {/* Mobile Quick Navigation - only on mobile */}
+        <div className="lg:hidden mb-6">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <Link 
+              href="/profile/orders"
+              className="flex items-center gap-2 px-4 py-3 bg-[#121212] border border-white/5 rounded-2xl whitespace-nowrap hover:bg-white/5 transition-colors"
+            >
+              <Package size={18} className="text-purple-400" />
+              <span className="text-sm font-medium">Rendeléseim</span>
+            </Link>
+            <Link 
+              href="/profile/addresses"
+              className="flex items-center gap-2 px-4 py-3 bg-[#121212] border border-white/5 rounded-2xl whitespace-nowrap hover:bg-white/5 transition-colors"
+            >
+              <MapPin size={18} className="text-purple-400" />
+              <span className="text-sm font-medium">Címeim</span>
+            </Link>
+            <Link 
+              href="/profile/loyalty"
+              className="flex items-center gap-2 px-4 py-3 bg-[#121212] border border-white/5 rounded-2xl whitespace-nowrap hover:bg-white/5 transition-colors"
+            >
+              <Award size={18} className="text-yellow-400" />
+              <span className="text-sm font-medium">Hűségprogram</span>
+            </Link>
+            <Link 
+              href="/profile/settings"
+              className="flex items-center gap-2 px-4 py-3 bg-[#121212] border border-white/5 rounded-2xl whitespace-nowrap hover:bg-white/5 transition-colors"
+            >
+              <Settings size={18} className="text-gray-400" />
+              <span className="text-sm font-medium">Beállítások</span>
+            </Link>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
@@ -361,10 +395,15 @@ export default async function ProfilePage() {
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
-                <Package className="text-purple-400" /> Rendeléseim
+                <Package className="text-purple-400" /> Legutóbbi rendelések
               </h2>
-              {orders.length > 5 && (
-                <span className="text-sm text-gray-500">{orders.length} rendelés</span>
+              {orders.length > 0 && (
+                <Link 
+                  href="/profile/orders"
+                  className="text-sm font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors"
+                >
+                  Összes megtekintése <ArrowRight size={14} />
+                </Link>
               )}
             </div>
 
@@ -384,14 +423,17 @@ export default async function ProfilePage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {orders.map((order: any) => {
+                {orders.slice(0, 3).map((order: any) => {
                   const status = statusConfig[order.status as keyof typeof statusConfig] || statusConfig.pending
                   const StatusIcon = status.icon
 
                   return (
-                    <div key={order.id} className="bg-[#121212] border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 transition-all group">
-                      {/* Order Header */}
-                      <div className="p-4 md:p-5 border-b border-white/5 bg-white/[0.02]">
+                    <Link 
+                      key={order.id} 
+                      href={`/orders/${order.id}`}
+                      className="block bg-[#121212] border border-white/5 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all group"
+                    >
+                      <div className="p-4 md:p-5">
                         <div className="flex flex-wrap gap-3 md:gap-4 justify-between items-center">
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center
@@ -404,88 +446,70 @@ export default async function ProfilePage() {
                               <StatusIcon size={20} />
                             </div>
                             <div>
-                              <p className="font-bold text-sm text-white">#{order.id.slice(-8).toUpperCase()}</p>
-                              <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-sm text-white">#{order.id.slice(-8).toUpperCase()}</p>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full
+                                  ${status.color === 'yellow' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' : ''}
+                                  ${status.color === 'blue' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : ''}
+                                  ${status.color === 'purple' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : ''}
+                                  ${status.color === 'green' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : ''}
+                                  ${status.color === 'red' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : ''}
+                                `}>
+                                  {status.label}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
                                 <Calendar size={12} />
                                 {new Date(order.createdAt).toLocaleDateString('hu-HU', {
                                   year: 'numeric',
                                   month: 'short',
                                   day: 'numeric'
                                 })}
+                                <span>•</span>
+                                <span>{order.items.length} termék</span>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-4">
                             <div className="text-right">
                               <p className="text-lg md:text-xl font-bold text-white">{order.totalPrice.toLocaleString('hu-HU')} Ft</p>
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full
-                                ${status.color === 'yellow' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' : ''}
-                                ${status.color === 'blue' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : ''}
-                                ${status.color === 'purple' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : ''}
-                                ${status.color === 'green' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : ''}
-                                ${status.color === 'red' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : ''}
-                              `}>
-                                {status.label}
-                              </span>
                             </div>
+                            <ChevronRight size={20} className="text-gray-600 group-hover:text-purple-400 transition-colors" />
                           </div>
-                        </div>
-                      </div>
-                      
-                      {/* Order Items */}
-                      <div className="p-4 md:p-5">
-                        <div className="space-y-3">
-                          {order.items.slice(0, 3).map((item: any) => (
-                            <div key={item.id} className="flex items-center gap-3">
-                              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center border border-white/5 overflow-hidden flex-shrink-0">
-                                {getImageUrl(item.product?.image) ? (
-                                  <img src={getImageUrl(item.product?.image)!} alt={item.product?.name || ''} className="w-full h-full object-cover" />
-                                ) : (
-                                  <Package size={20} className="text-gray-500" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-white text-sm truncate">{item.product?.name || 'Törölt termék'}</p>
-                                <p className="text-xs text-gray-500">{item.quantity} db × {item.price.toLocaleString('hu-HU')} Ft</p>
-                              </div>
-                              <p className="font-mono text-sm text-gray-400 hidden md:block">{(item.quantity * item.price).toLocaleString('hu-HU')} Ft</p>
-                            </div>
-                          ))}
-                          {order.items.length > 3 && (
-                            <p className="text-xs text-gray-500 text-center pt-2">+{order.items.length - 3} további termék</p>
-                          )}
                         </div>
                         
-                        {/* Order Footer */}
-                        <div className="mt-4 pt-4 border-t border-white/5 flex flex-wrap gap-3 justify-between items-center">
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <MapPin size={14} />
-                            <span className="truncate max-w-[150px] md:max-w-[250px]">{order.customerAddress}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {order.invoiceUrl && (
-                              <a 
-                                href={order.invoiceUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
-                              >
-                                <FileText size={14} /> Számla
-                              </a>
-                            )}
-                            <ReorderButton items={order.items} />
-                            <Link 
-                              href={`/orders/${order.id}`} 
-                              className="text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
-                            >
-                              Részletek <ArrowRight size={14} />
-                            </Link>
-                          </div>
+                        {/* Products preview */}
+                        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-white/5">
+                          {order.items.slice(0, 4).map((item: any, idx: number) => (
+                            <div key={idx} className="w-10 h-10 bg-white/5 rounded-lg border border-white/5 overflow-hidden flex-shrink-0">
+                              {getImageUrl(item.product?.image) ? (
+                                <img src={getImageUrl(item.product?.image)!} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package size={14} className="text-gray-600" />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {order.items.length > 4 && (
+                            <span className="text-xs text-gray-500">+{order.items.length - 4}</span>
+                          )}
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   )
                 })}
+                
+                {orders.length > 3 && (
+                  <Link 
+                    href="/profile/orders"
+                    className="block text-center p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-colors group"
+                  >
+                    <span className="text-gray-400 group-hover:text-white transition-colors font-medium">
+                      Összes rendelés megtekintése ({orders.length})
+                    </span>
+                  </Link>
+                )}
               </div>
             )}
           </div>

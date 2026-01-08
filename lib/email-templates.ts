@@ -80,7 +80,7 @@ export function emailHeader({ logoUrl, siteUrl }: { logoUrl?: string; siteUrl: s
       <a href="${siteUrl}" style="text-decoration: none; color: ${emailStyles.text};">
         ${logoUrl 
           ? `<img src="${logoUrl}" alt="NEXU" width="120" style="display: block; border: 0;" />`
-          : `<h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, ${emailStyles.primary} 0%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NEXU</h1>`
+          : `<h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #60a5fa 0%, #9333ea 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NEXU</h1>`
         }
       </a>
     </td>

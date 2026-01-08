@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, RefreshCw, Home, ChevronDown, ChevronUp, Bug } from 'lucide-react'
 import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
 
 interface ErrorBoundaryProps {
   error: Error & { digest?: string }
@@ -11,6 +12,8 @@ interface ErrorBoundaryProps {
   message?: string
   showHomeButton?: boolean
   showDetails?: boolean
+  /** Component name for better error tracking */
+  componentName?: string
 }
 
 export default function ErrorBoundary({
@@ -19,7 +22,8 @@ export default function ErrorBoundary({
   title = 'Hiba történt!',
   message = 'Valami váratlan hiba lépett fel. Kérjük, próbáld újra később.',
   showHomeButton = true,
-  showDetails = process.env.NODE_ENV === 'development'
+  showDetails = process.env.NODE_ENV === 'development',
+  componentName,
 }: ErrorBoundaryProps) {
   const [showErrorDetails, setShowErrorDetails] = useState(false)
   const [isRetrying, setIsRetrying] = useState(false)
@@ -27,7 +31,19 @@ export default function ErrorBoundary({
   useEffect(() => {
     // Log error for monitoring
     console.error('Error boundary caught:', error)
-  }, [error])
+    
+    // Report to Sentry
+    Sentry.withScope((scope) => {
+      if (componentName) {
+        scope.setTag('component', componentName)
+      }
+      scope.setTag('error_boundary', 'true')
+      if (error.digest) {
+        scope.setTag('error_digest', error.digest)
+      }
+      Sentry.captureException(error)
+    })
+  }, [error, componentName])
 
   const handleRetry = async () => {
     setIsRetrying(true)
@@ -162,6 +178,121 @@ export function ShopError({ error, reset }: { error: Error; reset: () => void })
       reset={reset}
       title="Termékek betöltése sikertelen"
       message="A termékek betöltése közben hiba lépett fel. Próbáld frissíteni az oldalt."
+      componentName="Shop"
     />
+  )
+}
+
+/**
+ * Minimal inline error display for small sections
+ */
+export function InlineError({ 
+  message = 'Nem sikerült betölteni', 
+  onRetry 
+}: { 
+  message?: string
+  onRetry?: () => void 
+}) {
+  return (
+    <div 
+      className="flex items-center justify-center gap-3 p-4 bg-red-500/5 border border-red-500/10 rounded-xl text-sm"
+      role="alert"
+      aria-live="polite"
+    >
+      <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" aria-hidden="true" />
+      <span className="text-gray-400">{message}</span>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="text-purple-400 hover:text-purple-300 underline underline-offset-2 focus-ring rounded"
+        >
+          Újra
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Section Error - for partial page failures
+ */
+export function SectionError({
+  title = 'Nem sikerült betölteni',
+  description = 'Ez a szekció jelenleg nem elérhető.',
+  onRetry,
+}: {
+  title?: string
+  description?: string
+  onRetry?: () => void
+}) {
+  return (
+    <div 
+      className="py-12 px-6 text-center"
+      role="alert"
+      aria-live="polite"
+    >
+      <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+        <AlertTriangle className="w-6 h-6 text-red-500" aria-hidden="true" />
+      </div>
+      <h3 className="text-lg font-medium text-white mb-2">{title}</h3>
+      <p className="text-gray-400 text-sm mb-4 max-w-md mx-auto">{description}</p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors focus-ring"
+        >
+          <RefreshCw className="w-4 h-4" aria-hidden="true" />
+          Újrapróbálás
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Empty State Component
+ */
+export function EmptyState({
+  icon: Icon = AlertTriangle,
+  title,
+  description,
+  action,
+}: {
+  icon?: React.ComponentType<{ className?: string }>
+  title: string
+  description?: string
+  action?: {
+    label: string
+    href?: string
+    onClick?: () => void
+  }
+}) {
+  return (
+    <div className="text-center py-12 px-6">
+      <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/5 flex items-center justify-center">
+        <Icon className="w-8 h-8 text-gray-400" />
+      </div>
+      <h3 className="text-lg font-medium text-white mb-2">{title}</h3>
+      {description && (
+        <p className="text-gray-400 text-sm mb-6 max-w-md mx-auto">{description}</p>
+      )}
+      {action && (
+        action.href ? (
+          <Link
+            href={action.href}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors focus-ring"
+          >
+            {action.label}
+          </Link>
+        ) : (
+          <button
+            onClick={action.onClick}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors focus-ring"
+          >
+            {action.label}
+          </button>
+        )
+      )}
+    </div>
   )
 }

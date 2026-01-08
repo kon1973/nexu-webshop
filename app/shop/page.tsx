@@ -4,11 +4,8 @@ import type { Metadata } from 'next'
 import { getProductsService } from '@/lib/services/productService'
 import { auth } from '@/lib/auth'
 import { unstable_cache } from 'next/cache'
-
-export const metadata: Metadata = {
-  title: 'Termékek',
-  description: 'Böngéssz a legújabb tech termékek között a NEXU Store-ban.',
-}
+import { getSiteUrl } from '@/lib/site'
+import { generateCategoryMetaDescription, normalizeCanonicalUrl } from '@/lib/seo-utils'
 
 // Cache static data that doesn't change often (5 minutes)
 const getCachedStaticData = unstable_cache(
@@ -28,16 +25,115 @@ const getCachedStaticData = unstable_cache(
   { revalidate: 300, tags: ['shop-static'] } // 5 minutes cache
 )
 
-// Cache category lookup
+// Cache category lookup with SEO fields
 const getCachedCategory = unstable_cache(
-  async (categoryName: string) => {
+  async (categorySlug: string) => {
     return prisma.category.findFirst({
-      where: { name: categoryName }
+      where: { 
+        OR: [
+          { slug: categorySlug },
+          { name: categorySlug }
+        ]
+      }
     })
   },
   ['shop-category'],
   { revalidate: 300, tags: ['categories'] }
 )
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}): Promise<Metadata> {
+  const params = await searchParams
+  const category = typeof params.category === 'string' ? params.category : undefined
+  const page = typeof params.page === 'string' ? Number(params.page) : 1
+  const siteUrl = getSiteUrl()
+
+  // Paginated pages deeper than this should not be indexed
+  const MAX_INDEX_PAGE = 5
+  const shouldIndex = page <= MAX_INDEX_PAGE
+
+  // Build canonical by preserving a safe allowlist of params and removing tracking params
+  const allowedFilterParams = ['category','search','sort','brand','minPrice','maxPrice','inStock','onSale','isNew','minRating','specs','boolSpecs']
+  const paramsObj: Record<string, string> = {}
+  for (const key of allowedFilterParams) {
+    const val = params[key]
+    if (typeof val === 'string' && val.trim() !== '') {
+      // Exclude page=1 from canonical
+      if (key === 'page' && Number(val) <= 1) continue
+      paramsObj[key] = val
+    }
+  }
+
+  // If category-specific metadata is requested
+  if (category) {
+    const categoryData = await getCachedCategory(category)
+
+    if (categoryData) {
+      const title = categoryData.metaTitle || `${categoryData.name} - NEXU Webshop`
+
+      // Use metaDescription if set, otherwise auto-generate
+      const description = categoryData.metaDescription ||
+        generateCategoryMetaDescription({
+          name: categoryData.name,
+          description: categoryData.description
+        })
+
+      const keywords = categoryData.metaKeywords?.split(',').map((k: string) => k.trim()) ||
+        [categoryData.name, 'NEXU', 'webshop']
+
+      // Build canonical retaining only allowed filters + page if >1
+      const rawUrl = new URL(`${siteUrl}/shop`)
+      rawUrl.search = ''
+      if (categoryData.slug) rawUrl.searchParams.set('category', categoryData.slug)
+      // preserve page if >1
+      if (page > 1) rawUrl.searchParams.set('page', String(page))
+      const canonical = normalizeCanonicalUrl(rawUrl.toString(), ['category','page'])
+
+      return {
+        title,
+        description,
+        keywords,
+        alternates: { canonical },
+        robots: { index: shouldIndex, follow: true },
+        openGraph: {
+          title,
+          description,
+          url: canonical,
+          siteName: 'NEXU Webshop',
+          locale: 'hu_HU',
+          type: 'website',
+          ...(categoryData.ogImage && { images: [{ url: categoryData.ogImage }] }),
+        }
+      }
+    }
+  }
+
+  // Default shop metadata (include search/filter params if present)
+  const rawUrl = new URL(`${siteUrl}/shop`)
+  // preserve only explicitly allowed params
+  for (const key of allowedFilterParams) {
+    const v = params[key]
+    if (typeof v === 'string' && v.trim() !== '') {
+      if (key === 'page') {
+        if (Number(v) > 1) rawUrl.searchParams.set('page', v)
+      } else {
+        rawUrl.searchParams.set(key, v)
+      }
+    }
+  }
+
+  const canonical = normalizeCanonicalUrl(rawUrl.toString(), allowedFilterParams)
+
+  return {
+    title: 'Termékek - NEXU Webshop',
+    description: 'Böngéssz a legújabb tech termékek között a NEXU Store-ban.',
+    alternates: { canonical },
+    robots: { index: shouldIndex, follow: true }
+  }
+}
 
 export default async function ShopPage({
   searchParams,
@@ -116,18 +212,26 @@ export default async function ShopPage({
     }).catch(err => console.error('Search log error:', err))
   }
 
+  const siteUrl = getSiteUrl()
+  const prevPageUrl = page > 1 ? normalizeCanonicalUrl(`${siteUrl}/shop${currentCategory ? `?category=${currentCategory.slug}&page=${page - 1}` : `?page=${page - 1}`}`, ['category','page']) : null
+  const nextPageUrl = page < productsData.totalPages ? normalizeCanonicalUrl(`${siteUrl}/shop${currentCategory ? `?category=${currentCategory.slug}&page=${page + 1}` : `?page=${page + 1}`}`, ['category','page']) : null
+
   return (
-    <ShopClient 
-      products={productsData.products} 
-      banners={banners} 
-      totalCount={productsData.totalCount}
-      currentPage={page}
-      totalPages={productsData.totalPages}
-      categories={categories}
-      brands={brands}
-      globalMaxPrice={globalMaxPrice}
-      currentCategory={currentCategory}
-    />
+    <>
+      {prevPageUrl && <link rel="prev" href={prevPageUrl} />}
+      {nextPageUrl && <link rel="next" href={nextPageUrl} />}
+      <ShopClient 
+        products={productsData.products} 
+        banners={banners} 
+        totalCount={productsData.totalCount}
+        currentPage={page}
+        totalPages={productsData.totalPages}
+        categories={categories}
+        brands={brands}
+        globalMaxPrice={globalMaxPrice}
+        currentCategory={currentCategory}
+      />
+    </>
   )
 }
 

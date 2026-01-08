@@ -12,10 +12,53 @@ export default function robots(): MetadataRoute.Robots {
   const siteUrl = getSiteUrl()
   const indexable = isIndexable()
 
+  if (!indexable) {
+    return {
+      rules: { userAgent: '*', disallow: '/' },
+    }
+  }
+
   return {
-    rules: indexable ? { userAgent: '*', allow: '/' } : { userAgent: '*', disallow: '/' },
-    sitemap: indexable ? new URL('/sitemap.xml', siteUrl).toString() : undefined,
-    host: indexable ? siteUrl.toString() : undefined,
+    rules: [
+      {
+        userAgent: '*',
+        allow: '/',
+        disallow: [
+          '/api/',
+          '/admin/',
+          '/checkout/',
+          '/success/',
+          '/profile/',
+          '/orders/',
+          '/login',
+          '/register',
+          '/forgot-password',
+          '/reset-password',
+          '/verify-email',
+          '/*?variant=*', // Let canonical handle variants
+        ],
+      },
+      {
+        userAgent: 'Googlebot',
+        allow: '/',
+        disallow: [
+          '/api/',
+          '/admin/',
+          '/checkout/',
+          '/success/',
+        ],
+      },
+      {
+        userAgent: 'Googlebot-Image',
+        allow: '/',
+        disallow: ['/api/', '/admin/'],
+      },
+    ],
+    sitemap: [
+      new URL('/sitemap.xml', siteUrl).toString(),
+      new URL('/api/sitemap-images', siteUrl).toString(),
+    ],
+    host: siteUrl.toString(),
   }
 }
 

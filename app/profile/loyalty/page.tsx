@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { getLoyaltyTier, getNextLoyaltyTier, LOYALTY_TIERS } from '@/lib/loyalty'
 import Link from 'next/link'
 import { ArrowLeft, Crown, Star, Zap, Gift, TrendingUp, CheckCircle } from 'lucide-react'
+import ProfileSidebar from '../ProfileSidebar'
 
 const tierIcons: Record<string, typeof Crown> = {
   'Bronze': Star,
@@ -42,20 +43,35 @@ export default async function LoyaltyPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pt-20 md:pt-24 pb-12">
-      <div className="container mx-auto px-4 max-w-5xl">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link 
-            href="/profile" 
-            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
-          >
-            <ArrowLeft size={20} />
-          </Link>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Hűségprogram</h1>
-            <p className="text-gray-400 text-sm">Szerezz extra kedvezményeket minden vásárlással</p>
-          </div>
-        </div>
+      <div className="container mx-auto px-4 max-w-6xl">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+          {/* Sidebar - hidden on mobile */}
+          <aside className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-24">
+              <div className="bg-[#121212] border border-white/5 rounded-2xl p-4">
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 px-4">
+                  Fiókom
+                </h2>
+                <ProfileSidebar />
+              </div>
+            </div>
+          </aside>
+          
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-8">
+              <Link 
+                href="/profile" 
+                className="lg:hidden w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+              >
+                <ArrowLeft size={20} />
+              </Link>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold">Hűségprogram</h1>
+                <p className="text-gray-400 text-sm">Szerezz extra kedvezményeket minden vásárlással</p>
+              </div>
+            </div>
 
         {/* Current Tier Hero */}
         <div className="relative overflow-hidden bg-gradient-to-br from-purple-900/40 via-[#121212] to-blue-900/40 rounded-3xl p-6 md:p-10 mb-8 border border-white/10">
@@ -219,6 +235,8 @@ export default async function LoyaltyPage() {
                 <p className="text-sm text-gray-400">A kedvezmények automatikusan érvényesülnek.</p>
               </div>
             </div>
+          </div>
+        </div>
           </div>
         </div>
       </div>

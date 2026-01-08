@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 export const ProductSchema = z.object({
   name: z.string().min(1, "Név megadása kötelező"),
+  slug: z.string().optional().nullable(),
   category: z.string().min(1, "Kategória megadása kötelező"),
   price: z.coerce.number().int().positive("Az árnak pozitív egész számnak kell lennie"),
   stock: z.coerce.number().int().nonnegative().default(10),
@@ -20,6 +21,28 @@ export const ProductSchema = z.object({
   options: z.array(z.any()).default([]),
   isArchived: z.boolean().default(false),
   brandId: z.string().optional().nullable(),
+  // SEO fields
+  metaTitle: z.string().max(70, "SEO cím max 70 karakter").optional().nullable(),
+  metaDescription: z.string().max(160, "SEO leírás max 160 karakter").optional().nullable(),
+  metaKeywords: z.string().optional().nullable(),
+  canonicalUrl: z.string().url().optional().nullable(),
+  ogImage: z.string().optional().nullable(),
+  // Product identifiers
+  gtin: z.string().optional().nullable(),
+  mpn: z.string().optional().nullable(),
+  sku: z.string().optional().nullable(),
+  // Optional videos
+  videos: z.array(z.object({
+    url: z.string().url(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    thumbnail: z.string().optional(),
+    uploadDate: z.string().optional(),
+  })).optional().nullable().refine((videos) => {
+    if (!videos) return true
+    const { isTrustedVideoHost } = require('@/lib/video-utils')
+    return videos.every((v: any) => isTrustedVideoHost(v.url))
+  }, { message: 'Videó URL-eknek engedélyezett hostokról kell származniuk (YouTube, Vimeo, stb.)' }),
 })
 
 export type CreateProductInput = z.infer<typeof ProductSchema>
@@ -156,6 +179,7 @@ export async function getProductByIdService(id: number, onlyApprovedReviews = fa
     include: {
       variants: true,
       options: true,
+      brand: true,
       reviews: {
         where: onlyApprovedReviews ? { status: 'approved' } : {},
         include: { user: { select: { name: true, image: true } } },
@@ -163,6 +187,46 @@ export async function getProductByIdService(id: number, onlyApprovedReviews = fa
       }
     }
   })
+}
+
+// Get product by slug or ID - SEO friendly URLs
+export async function getProductBySlugOrIdService(slugOrId: string, onlyApprovedReviews = false) {
+  // First try to find by slug
+  let product = await prisma.product.findUnique({
+    where: { slug: slugOrId },
+    include: {
+      variants: true,
+      options: true,
+      brand: true,
+      reviews: {
+        where: onlyApprovedReviews ? { status: 'approved' } : {},
+        include: { user: { select: { name: true, image: true } } },
+        orderBy: { createdAt: 'desc' }
+      }
+    }
+  })
+  
+  // If not found by slug, try by ID (for backward compatibility)
+  if (!product) {
+    const id = Number.parseInt(slugOrId, 10)
+    if (!Number.isNaN(id)) {
+      product = await prisma.product.findUnique({
+        where: { id },
+        include: {
+          variants: true,
+          options: true,
+          brand: true,
+          reviews: {
+            where: onlyApprovedReviews ? { status: 'approved' } : {},
+            include: { user: { select: { name: true, image: true } } },
+            orderBy: { createdAt: 'desc' }
+          }
+        }
+      })
+    }
+  }
+  
+  return product
 }
 
 export async function createProductService(data: CreateProductInput) {
@@ -225,6 +289,7 @@ export async function createProductService(data: CreateProductInput) {
           saleEndDate: v.saleEndDate ? new Date(v.saleEndDate) : null,
           stock: Number(v.stock),
           sku: v.sku || null,
+          slug: v.slug || null,
           images: v.image ? [v.image] : [],
         }))
       }
@@ -297,6 +362,7 @@ export async function updateProductService(id: number, data: UpdateProductInput)
           saleEndDate: v.saleEndDate ? new Date(v.saleEndDate) : null,
           stock: Number(v.stock),
           sku: v.sku || null,
+          slug: v.slug || null,
           images: v.image ? [v.image] : [],
         }
 

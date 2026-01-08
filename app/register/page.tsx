@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const router = useRouter()
 
   // Password strength indicators
@@ -140,9 +141,40 @@ export default function RegisterPage() {
             )}
           </div>
 
+          {/* ÁSZF és Adatkezelési checkbox */}
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="acceptTerms"
+              required
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="w-5 h-5 mt-0.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-[#0a0a0a] cursor-pointer accent-purple-600"
+            />
+            <label htmlFor="acceptTerms" className="text-sm text-gray-300 cursor-pointer select-none leading-relaxed">
+              Elolvastam és elfogadom az{' '}
+              <Link 
+                href="/aszf" 
+                target="_blank" 
+                className="text-purple-400 hover:text-purple-300 underline font-semibold"
+              >
+                ÁSZF-et
+              </Link>
+              {' '}és az{' '}
+              <Link 
+                href="/adatkezeles" 
+                target="_blank" 
+                className="text-purple-400 hover:text-purple-300 underline font-semibold"
+              >
+                Adatkezelési Tájékoztatót
+              </Link>
+              . <span className="text-red-400">*</span>
+            </label>
+          </div>
+
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !acceptedTerms}
             className="w-full py-4 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
           >
             {isLoading ? (

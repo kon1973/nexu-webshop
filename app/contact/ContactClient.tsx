@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Mail, MapPin, Phone, Loader2, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { sendContactMessage } from './actions'
+import { getSiteUrl } from '@/lib/site'
 
 interface ContactClientProps {
   settings: Record<string, string>
@@ -12,6 +13,40 @@ interface ContactClientProps {
 export default function ContactClient({ settings }: ContactClientProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  const siteUrl = getSiteUrl()
+
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Kezdőlap', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Kapcsolat', item: `${siteUrl}/contact` }
+    ]
+  }
+
+  const contactJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ContactPage',
+    mainEntity: {
+      '@type': 'Organization',
+      name: 'NEXU Store',
+      url: siteUrl,
+      contactPoint: {
+        '@type': 'ContactPoint',
+        telephone: settings.contact_phone || '+36 1 234 5678',
+        email: settings.contact_email || 'info@nexu.hu',
+        contactType: 'customer service',
+        availableLanguage: 'Hungarian',
+        areaServed: 'HU'
+      },
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: settings.contact_address || 'Tech utca 42.',
+        addressLocality: 'Budapest',
+        addressCountry: 'HU'
+      }
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -43,6 +78,8 @@ export default function ContactClient({ settings }: ContactClientProps) {
 
   return (
     <div className="container mx-auto px-4 pt-32 pb-12 text-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(contactJsonLd) }} />
       <h1 className="text-4xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
         Kapcsolat
       </h1>

@@ -37,7 +37,7 @@ const SuggestionItem = memo(function SuggestionItem({
     >
       <div className="w-12 h-12 bg-[#1a1a1a] rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
         {imageUrl ? (
-          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+          <img src={imageUrl} alt={product.name} className="w-full h-full object-cover" />
         ) : (
           <Package size={20} className="text-gray-500" />
         )}

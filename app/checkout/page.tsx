@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useEffect, useTransition, type FormEvent } from 'react'
-import { ArrowLeft, CheckCircle, CreditCard, Loader2, Truck, MapPin, Banknote, UserPlus, Package, Shield, Clock, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, CheckCircle, CreditCard, Loader2, Truck, MapPin, Banknote, UserPlus, Package, Shield, Clock, AlertTriangle, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCart } from '@/context/CartContext'
@@ -33,7 +33,7 @@ interface Address {
 
 export default function CheckoutPage() {
   const { cart, itemCount, clearCart, coupon, applyCoupon, removeCoupon } = useCart()
-  const { getNumberSetting } = useSettings()
+  const { getNumberSetting, getSetting } = useSettings()
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -47,6 +47,7 @@ export default function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<string>('')
   
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'stripe'>('cod')
+  const [shippingMethod, setShippingMethod] = useState<'gls' | 'mpl'>('gls')
   const [clientSecret, setClientSecret] = useState('')
   
   const [loyaltyDiscountPercentage, setLoyaltyDiscountPercentage] = useState(0)
@@ -57,6 +58,7 @@ export default function CheckoutPage() {
   const [deliveryEstimate, setDeliveryEstimate] = useState<string>('')
   const [cartErrors, setCartErrors] = useState<string[]>([])
   const [cartValidated, setCartValidated] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -65,7 +67,10 @@ export default function CheckoutPage() {
     zipCode: '',
     city: '',
     street: '',
-    country: 'Magyarország'
+    country: 'Magyarország',
+    orderNotes: '',
+    isGift: false,
+    giftMessage: ''
   })
 
   const [useDifferentBillingAddress, setUseDifferentBillingAddress] = useState(false)
@@ -194,7 +199,14 @@ export default function CheckoutPage() {
 
   const subtotal = useMemo(() => cart.reduce((total, item) => total + item.price * item.quantity, 0), [cart])
   const hasFreeShipping = subtotal >= freeShippingThreshold
-  const shippingCost = cart.length === 0 ? 0 : hasFreeShipping ? 0 : shippingFee
+  const mplShippingFee = 1990 // Magyar Posta (MPL) szállítási díj
+  const baseShippingCost = shippingMethod === 'mpl' ? mplShippingFee : shippingFee
+  const shippingCost = cart.length === 0 ? 0 : hasFreeShipping ? 0 : baseShippingCost
+  
+  // Gift wrapping fee from settings
+  const giftWrappingEnabled = getSetting('gift_wrapping_enabled', 'false') === 'true'
+  const giftWrappingPrice = getNumberSetting('gift_wrapping_price', 990)
+  const giftWrappingFee = giftWrappingEnabled && formData.isGift ? giftWrappingPrice : 0
   
   const discountAmount = useMemo(() => {
     if (!coupon) return 0
@@ -209,7 +221,7 @@ export default function CheckoutPage() {
       return Math.round(subtotal * loyaltyDiscountPercentage)
   }, [subtotal, loyaltyDiscountPercentage])
 
-  const totalPrice = Math.max(0, subtotal + shippingCost - discountAmount - loyaltyDiscountAmount)
+  const totalPrice = Math.max(0, subtotal + shippingCost + giftWrappingFee - discountAmount - loyaltyDiscountAmount)
   const missingForFree = Math.max(freeShippingThreshold - subtotal, 0)
   const freeShippingProgress = Math.min(subtotal / freeShippingThreshold, 1)
 
@@ -397,21 +409,22 @@ export default function CheckoutPage() {
           )}
         </AnimatePresence>
 
-        <div className="flex items-center justify-center mb-12">
-          <div className="flex items-center gap-4 text-sm sm:text-base">
-            <div className="flex items-center gap-2 text-green-500 font-bold">
-              <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center border border-green-500/30">1</div>
-              <span>Kosár</span>
+        {/* Mobile Progress Stepper */}
+        <div className="flex items-center justify-center mb-8 md:mb-12">
+          <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-base w-full max-w-md justify-between px-4 sm:px-0">
+            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-green-500 font-bold">
+              <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-green-500/20 flex items-center justify-center border-2 sm:border border-green-500/50 sm:border-green-500/30 text-sm sm:text-base">✓</div>
+              <span className="text-[10px] sm:text-base">Kosár</span>
             </div>
-            <div className="w-8 sm:w-12 h-0.5 bg-white/10" />
-            <div className="flex items-center gap-2 text-blue-400 font-bold">
-              <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">2</div>
-              <span>Adatok</span>
+            <div className="flex-1 h-0.5 bg-green-500/30 mx-1 sm:mx-0 sm:w-8 sm:flex-none" />
+            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-blue-400 font-bold">
+              <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-blue-500/20 flex items-center justify-center border-2 sm:border border-blue-500/50 sm:border-blue-500/30 text-sm sm:text-base">2</div>
+              <span className="text-[10px] sm:text-base">Adatok</span>
             </div>
-            <div className="w-8 sm:w-12 h-0.5 bg-white/10" />
-            <div className="flex items-center gap-2 text-gray-500 font-bold">
-              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">3</div>
-              <span>Kész</span>
+            <div className="flex-1 h-0.5 bg-white/10 mx-1 sm:mx-0 sm:w-8 sm:flex-none" />
+            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-gray-500 font-bold">
+              <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center border-2 sm:border border-white/20 sm:border-white/10 text-sm sm:text-base">3</div>
+              <span className="text-[10px] sm:text-base">Kész</span>
             </div>
           </div>
         </div>
@@ -451,7 +464,7 @@ export default function CheckoutPage() {
         )}
 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-8">
-          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
             Pénztár
           </h1>
           <p className="text-sm text-gray-500">
@@ -542,11 +555,12 @@ export default function CheckoutPage() {
                     required
                     name="phone"
                     type="tel"
+                    inputMode="tel"
                     value={formData.phone}
                     onChange={e => setFormData({...formData, phone: e.target.value})}
                     placeholder="+36 30 123 4567"
                     autoComplete="tel"
-                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-colors"
+                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-colors text-base"
                   />
                 </div>
 
@@ -570,11 +584,13 @@ export default function CheckoutPage() {
                         required
                         name="zipCode"
                         type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={formData.zipCode}
                         onChange={e => setFormData({...formData, zipCode: e.target.value})}
                         placeholder="Irányítószám"
                         autoComplete="postal-code"
-                        className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-colors"
+                        className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-colors text-base"
                       />
                     </div>
                   </div>
@@ -744,10 +760,135 @@ export default function CheckoutPage() {
               </form>
             </div>
 
+            {/* Szállítási mód */}
             <div className="bg-[#121212] border border-white/5 rounded-2xl p-8 mb-6 shadow-xl">
               <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                <CreditCard className="text-blue-400" /> Fizetési mód
+                <Truck className="text-blue-400" /> Szállítási mód
               </h2>
+              
+              <div className="space-y-3">
+                <label className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${shippingMethod === 'gls' ? 'bg-purple-500/10 border-purple-500' : 'bg-[#0a0a0a] border-white/10 hover:border-white/20'}`}>
+                  <input 
+                    type="radio" 
+                    name="shippingMethod" 
+                    value="gls" 
+                    checked={shippingMethod === 'gls'} 
+                    onChange={() => setShippingMethod('gls')}
+                    className="w-5 h-5 text-purple-600 bg-[#0a0a0a] border-gray-600 focus:ring-purple-500"
+                  />
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
+                      <Package className="text-yellow-400" size={20} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold">GLS Futárszolgálat</div>
+                      <div className="text-xs text-gray-400">Kézbesítés 1-3 munkanapon belül</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-white">
+                        {hasFreeShipping ? 'Ingyenes' : `${shippingFee.toLocaleString('hu-HU')} Ft`}
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <label className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${shippingMethod === 'mpl' ? 'bg-purple-500/10 border-purple-500' : 'bg-[#0a0a0a] border-white/10 hover:border-white/20'}`}>
+                  <input 
+                    type="radio" 
+                    name="shippingMethod" 
+                    value="mpl" 
+                    checked={shippingMethod === 'mpl'} 
+                    onChange={() => setShippingMethod('mpl')}
+                    className="w-5 h-5 text-purple-600 bg-[#0a0a0a] border-gray-600 focus:ring-purple-500"
+                  />
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
+                      <MapPin className="text-red-400" size={20} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold flex items-center gap-2">
+                        Magyar Posta (MPL)
+                        <div className="relative group">
+                          <Info size={16} className="text-gray-400 hover:text-blue-400 cursor-help transition-colors" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-[#1a1a1a] border border-white/10 rounded-lg text-xs text-gray-300 whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 shadow-xl">
+                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-[#1a1a1a] border-r border-b border-white/10 rotate-45"></div>
+                            A 335/2012. (XII. 4.) Korm. rendelet szerinti<br/>kötelezően biztosítandó postai szállítási mód.
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400">Kézbesítés 2-5 munkanapon belül</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-white">
+                        {hasFreeShipping ? 'Ingyenes' : `${mplShippingFee.toLocaleString('hu-HU')} Ft`}
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Order Notes */}
+            <div className="bg-[#121212] border border-white/5 rounded-2xl p-8 mb-6 shadow-xl">
+              <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+                <Package className="text-blue-400" /> Megjegyzés a rendeléshez
+              </h2>
+              <textarea
+                name="orderNotes"
+                placeholder="Írj megjegyzést a rendeléshez (pl. kapucsengő, emeleti lift, stb.)"
+                value={formData.orderNotes || ''}
+                onChange={e => setFormData({...formData, orderNotes: e.target.value})}
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-colors resize-none h-24"
+                maxLength={500}
+              />
+              <p className="text-xs text-gray-500 mt-2 text-right">{(formData.orderNotes || '').length}/500</p>
+            </div>
+
+            {/* Gift Options - only show if enabled in admin */}
+            {getSetting('gift_wrapping_enabled', 'false') === 'true' && (
+            <div className="bg-[#121212] border border-white/5 rounded-2xl p-8 mb-6 shadow-xl">
+              <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+                <span className="text-2xl">🎁</span> Ajándék opciók
+              </h2>
+              
+              <div className="space-y-4">
+                <label className="flex items-start gap-4 p-4 rounded-xl border border-white/10 hover:border-purple-500/30 transition-all cursor-pointer bg-[#0a0a0a]">
+                  <input
+                    type="checkbox"
+                    checked={formData.isGift || false}
+                    onChange={e => setFormData({...formData, isGift: e.target.checked})}
+                    className="w-5 h-5 mt-0.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-[#0a0a0a]"
+                  />
+                  <div className="flex-1">
+                    <div className="font-bold text-white">Ajándékcsomagolás</div>
+                    <div className="text-xs text-gray-400 mt-1">Elegáns csomagolás ajándékszálaggal (+{getNumberSetting('gift_wrapping_price', 990).toLocaleString('hu-HU')} Ft)</div>
+                  </div>
+                </label>
+                
+                {formData.isGift && (
+                  <div className="animate-in fade-in slide-in-from-top-2 space-y-4 pl-4 border-l-2 border-purple-500/30">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-400 mb-2">Ajándéküzenet (opcionális)</label>
+                      <textarea
+                        placeholder="Írj személyes üdvözletet az ajándékhoz..."
+                        value={formData.giftMessage || ''}
+                        onChange={e => setFormData({...formData, giftMessage: e.target.value})}
+                        className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none transition-colors resize-none h-20"
+                        maxLength={200}
+                      />
+                      <p className="text-xs text-gray-500 mt-1 text-right">{(formData.giftMessage || '').length}/200</p>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                      <span className="text-purple-400 text-sm">ℹ️</span>
+                      <span className="text-xs text-purple-300">A számla nem kerül a csomagba ajándékcsomagolás esetén.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            )}
+
+            <div className="bg-[#121212] border border-white/5 rounded-2xl p-8 mb-6 shadow-xl">
               
               <div className="space-y-3">
                 <label className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${paymentMethod === 'cod' ? 'bg-purple-500/10 border-purple-500' : 'bg-[#0a0a0a] border-white/10 hover:border-white/20'}`}>
@@ -805,6 +946,8 @@ export default function CheckoutPage() {
                         discountAmount={discountAmount}
                         saveAddress={saveAddress}
                         clientSecret={clientSecret}
+                        acceptedTerms={acceptedTerms}
+                        setAcceptedTerms={setAcceptedTerms}
                         onSuccess={(orderId) => {
                           clearCart()
                           router.push(`/success?orderId=${encodeURIComponent(orderId)}&email=1`)
@@ -847,7 +990,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="w-full h-2 bg-[#0a0a0a] rounded-full overflow-hidden border border-white/5">
                   <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-blue-400 transition-[width] duration-500"
+                    className="h-full bg-gradient-to-r from-blue-400 to-purple-600 transition-[width] duration-500"
                     style={{ width: `${freeShippingProgress * 100}%` }}
                   />
                 </div>
@@ -960,27 +1103,62 @@ export default function CheckoutPage() {
                     {shippingCost === 0 ? 'Ingyenes' : `${shippingCost.toLocaleString('hu-HU')} Ft`}
                   </span>
                 </div>
+                {giftWrappingFee > 0 && (
+                  <div className="flex justify-between text-gray-400">
+                    <span>🎁 Ajándékcsomagolás</span>
+                    <span className="text-gray-200 font-bold">+{giftWrappingFee.toLocaleString('hu-HU')} Ft</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-2xl font-bold text-white pt-4 border-t border-white/10">
                   <span>Végösszeg</span>
                   <span>{totalPrice.toLocaleString('hu-HU')} Ft</span>
                 </div>
               </div>
 
+              {/* Jogi checkbox - ÁSZF és Adatkezelés elfogadása */}
+              <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-blue-600/5 to-purple-600/5 rounded-xl border border-white/10">
+                <input
+                  type="checkbox"
+                  id="acceptTerms"
+                  required
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="w-5 h-5 mt-0.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-[#0a0a0a] cursor-pointer"
+                />
+                <label htmlFor="acceptTerms" className="text-sm text-gray-300 cursor-pointer select-none leading-relaxed">
+                  Elolvastam és elfogadom az{' '}
+                  <Link 
+                    href="/aszf" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 underline font-semibold"
+                  >
+                    ÁSZF-et
+                  </Link>
+                  {' '}és az{' '}
+                  <Link 
+                    href="/adatkezeles" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 underline font-semibold"
+                  >
+                    Adatkezelési Tájékoztatót
+                  </Link>
+                  . <span className="text-red-400">*</span>
+                </label>
+              </div>
+
               {paymentMethod === 'cod' && (
               <button
                 type="submit"
                 form="checkout-form"
-                disabled={isSubmitting || cartErrors.length > 0}
+                disabled={isSubmitting || cartErrors.length > 0 || !acceptedTerms}
                 className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl text-lg shadow-lg shadow-purple-900/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle size={22} />}
                 {isSubmitting ? 'Feldolgozás...' : 'Megrendelés leadása'}
               </button>
               )}
-
-              <p className="text-xs text-gray-500 text-center mt-4">
-                A gombra kattintva elfogadod az Általános Szerződési Feltételeket.
-              </p>
 
               {/* Trust badges */}
               <div className="mt-6 pt-6 border-t border-white/10">
@@ -999,6 +1177,33 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile Sticky Order Summary Footer */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#121212] border-t border-white/10 p-4 z-40 shadow-[0_-4px_30px_rgba(0,0,0,0.5)]">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-xs text-gray-400">{itemCount} termék</p>
+            <p className="text-xl font-bold text-white">{totalPrice.toLocaleString('hu-HU')} Ft</p>
+          </div>
+          {paymentMethod === 'cod' && (
+            <button
+              type="submit"
+              form="checkout-form"
+              disabled={isSubmitting || cartErrors.length > 0 || !acceptedTerms}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-900/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+              {isSubmitting ? 'Feldolgozás...' : 'Megrendelés'}
+            </button>
+          )}
+        </div>
+        {!acceptedTerms && (
+          <p className="text-xs text-amber-400 text-center">Kérjük, fogadd el az ÁSZF-et a rendeléshez</p>
+        )}
+      </div>
+      
+      {/* Spacer for mobile sticky footer */}
+      <div className="lg:hidden h-28" />
     </div>
   )
 }

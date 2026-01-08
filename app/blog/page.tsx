@@ -4,10 +4,27 @@ import Image from 'next/image'
 import { Calendar, User } from 'lucide-react'
 import type { Metadata } from 'next'
 import { getImageUrl } from '@/lib/image'
+import { getSiteUrl } from '@/lib/site'
+
+const siteUrl = getSiteUrl()
 
 export const metadata: Metadata = {
   title: 'Blog - NEXU Webshop',
   description: 'Hírek, tippek és újdonságok a technológia világából.',
+  alternates: { canonical: `${siteUrl}/blog` },
+  openGraph: {
+    title: 'Blog | NEXU Webshop',
+    description: 'Hírek, tippek és újdonságok a technológia világából.',
+    url: `${siteUrl}/blog`,
+    siteName: 'NEXU Webshop',
+    locale: 'hu_HU',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Blog | NEXU Webshop',
+    description: 'Hírek, tippek és újdonságok a technológia világából.',
+  },
 }
 
 export default async function BlogPage() {

@@ -350,7 +350,7 @@ function RangeFilter({
       {/* Visual range slider */}
       <div className="relative h-2 bg-white/10 rounded-full">
         <div
-          className="absolute h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
+          className="absolute h-full bg-gradient-to-r from-blue-400 to-purple-600 rounded-full"
           style={{
             left: `${((localMin - min) / (max - min)) * 100}%`,
             right: `${100 - ((localMax - min) / (max - min)) * 100}%`

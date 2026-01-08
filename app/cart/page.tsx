@@ -405,7 +405,7 @@ export default function CartPage() {
                 </div>
                 <div className="w-full h-2 bg-[#0a0a0a] rounded-full overflow-hidden border border-white/5">
                   <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-blue-400 transition-[width] duration-500"
+                    className="h-full bg-gradient-to-r from-blue-400 to-purple-600 transition-[width] duration-500"
                     style={{ width: `${freeShippingProgress * 100}%` }}
                   />
                 </div>
@@ -428,13 +428,13 @@ export default function CartPage() {
                     onChange={(e) => setCouponCode(e.target.value)}
                     placeholder="Kuponkód"
                     disabled={!!coupon || isCouponLoading}
-                    className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 placeholder-gray-600 disabled:opacity-50"
+                    className="flex-1 min-w-0 bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 placeholder-gray-600 disabled:opacity-50"
                   />
                   <button
                     type="button"
                     onClick={handleApplyCoupon}
                     disabled={!!coupon || isCouponLoading}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-lg transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-lg transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0"
                   >
                     {isCouponLoading ? '...' : 'Alkalmaz'}
                   </button>

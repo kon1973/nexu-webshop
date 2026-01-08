@@ -391,7 +391,7 @@ function MobileFilterContent({
                     : 'bg-white/5 text-gray-400 border border-white/10'
                 }`}
               >
-                {brand.logo && <img src={brand.logo} alt="" className="w-4 h-4 object-contain rounded" />}
+                {brand.logo && <img src={brand.logo} alt={`${brand.name} logó`} className="w-4 h-4 object-contain rounded" />}
                 {brand.name}
               </button>
             ))}

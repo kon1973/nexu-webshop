@@ -11,6 +11,9 @@ import { ProductImages } from '../../components/product-form/ProductImages'
 import { ProductVariants } from '../../components/product-form/ProductVariants'
 import { ProductSpecifications } from '../../components/product-form/ProductSpecifications'
 import { ProductDescriptions } from '../../components/product-form/ProductDescriptions'
+import ProductVideos from '../../components/product-form/ProductVideos'
+import { ProductSEO } from '../../components/product-form/ProductSEO'
+import { generateVariantSlug } from '@/lib/seo-utils'
 
 type Attribute = {
   id: string
@@ -28,6 +31,7 @@ type Variant = {
   saleEndDate?: string | null
   stock: number
   sku?: string
+  slug?: string
   image?: string
   description?: string
   isActive: boolean
@@ -107,6 +111,18 @@ export default function EditProductForm({ product, initialCategories, initialAtt
   const [specTemplates, setSpecTemplates] = useState<SpecTemplate[]>(initialSpecTemplates)
   const [specifications, setSpecifications] = useState<{ key: string, value: string | boolean, type: 'text' | 'boolean' | 'header' }[]>([])
 
+  // Videos state
+  const [videos, setVideos] = useState<any[]>((product as any).videos || [])
+
+  // SEO state
+  const [metaTitle, setMetaTitle] = useState((product as any).metaTitle || '')
+  const [metaDescription, setMetaDescription] = useState((product as any).metaDescription || '')
+  const [metaKeywords, setMetaKeywords] = useState((product as any).metaKeywords || '')
+  const [slug, setSlug] = useState((product as any).slug || '')
+  const [gtin, setGtin] = useState((product as any).gtin || '')
+  const [mpn, setMpn] = useState((product as any).mpn || '')
+  const [productSku, setProductSku] = useState((product as any).sku || '')
+
   useEffect(() => {
     // Initialize variants and attributes from product
     if (product.variants && product.variants.length > 0) {
@@ -120,6 +136,7 @@ export default function EditProductForm({ product, initialCategories, initialAtt
         saleEndDate: v.saleEndDate ? new Date(v.saleEndDate).toISOString().split('T')[0] : null,
         stock: v.stock,
         sku: v.sku || '',
+        slug: (v as any).slug || '',
         image: (v.images && v.images.length > 0 ? v.images[0] : '') || '',
         description: v.description || '',
         isActive: (v as any).isActive ?? true
@@ -244,6 +261,7 @@ export default function EditProductForm({ product, initialCategories, initialAtt
       saleEndDate: saleEndDate || null,
       stock: baseStock || 0,
       sku: '',
+      slug: generateVariantSlug(combo), // Auto-generate SEO-friendly slug
       image: images[0] || '',
       description: '',
       isActive: true
@@ -327,14 +345,10 @@ export default function EditProductForm({ product, initialCategories, initialAtt
       fullDescription: formData.get('fullDescription'),
       image: images[0] || '\u{1f4e6}',
       images: images,
-      isArchived: isArchived,
-      brandId: brandId || null,
-      specifications: specifications.filter(s => {
-        if (!s.key) return false
-        if (s.type === 'header') return true
-        if (s.type === 'boolean') return s.value !== undefined && s.value !== null
-        return s.value !== undefined && s.value !== ''
-      }),
+      videos: videos.length > 0 ? videos : undefined,
+      gtin: gtin || null,
+      mpn: mpn || null,
+      sku: productSku || null,
       variants: variants.map(v => ({
         id: v.id.startsWith('new-') ? undefined : v.id, // Only send ID if it's an existing variant
         attributes: v.attributes,
@@ -345,6 +359,7 @@ export default function EditProductForm({ product, initialCategories, initialAtt
         saleEndDate: v.saleEndDate ? new Date(v.saleEndDate).toISOString() : null,
         stock: Number(v.stock),
         sku: v.sku,
+        slug: v.slug || generateVariantSlug(v.attributes), // Ensure slug is set
         image: v.image,
         description: v.description,
         isActive: v.isActive
@@ -438,6 +453,27 @@ export default function EditProductForm({ product, initialCategories, initialAtt
               addSpecRow={addSpecRow}
               removeSpecRow={removeSpecRow}
               updateSpec={updateSpec}
+            />
+
+            <ProductVideos videos={videos} setVideos={setVideos} />
+
+            <ProductSEO
+              name={name}
+              description={description}
+              metaTitle={metaTitle}
+              setMetaTitle={setMetaTitle}
+              metaDescription={metaDescription}
+              setMetaDescription={setMetaDescription}
+              metaKeywords={metaKeywords}
+              setMetaKeywords={setMetaKeywords}
+              slug={slug}
+              setSlug={setSlug}
+              gtin={gtin}
+              setGtin={setGtin}
+              mpn={mpn}
+              setMpn={setMpn}
+              productSku={productSku}
+              setProductSku={setProductSku}
             />
 
             <button

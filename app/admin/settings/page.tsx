@@ -242,6 +242,45 @@ export default function SettingsPage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Gift Wrapping Toggle */}
+                <div className="mt-8 pt-6 border-t border-white/10">
+                  <h3 className="text-lg font-semibold mb-4 text-white">Ajándékcsomagolás</h3>
+                  <div className="flex items-center justify-between p-4 bg-[#0a0a0a] rounded-xl border border-white/10">
+                    <div>
+                      <p className="font-medium text-white">Ajándékcsomagolás engedélyezése</p>
+                      <p className="text-sm text-gray-400 mt-1">Ha bekapcsolt, a vásárlók kérhetnek ajándékcsomagolást a pénztárnál</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('gift_wrapping_enabled', settings.gift_wrapping_enabled === 'true' ? 'false' : 'true')}
+                      className={`relative w-14 h-7 rounded-full transition-colors ${
+                        settings.gift_wrapping_enabled === 'true' ? 'bg-purple-600' : 'bg-gray-600'
+                      }`}
+                    >
+                      <span 
+                        className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                          settings.gift_wrapping_enabled === 'true' ? 'left-8' : 'left-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {settings.gift_wrapping_enabled === 'true' && (
+                    <div className="mt-4 grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Ajándékcsomagolás ára (HUF)</label>
+                        <input
+                          type="number"
+                          value={settings.gift_wrapping_price || ''}
+                          onChange={(e) => handleChange('gift_wrapping_price', e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus:border-purple-500 outline-none transition-colors"
+                          placeholder="990"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

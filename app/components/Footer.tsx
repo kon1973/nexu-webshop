@@ -54,7 +54,7 @@ export default function Footer({ settings }: FooterProps) {
   return (
     <footer className={`bg-[#050505] border-t border-white/10 pt-16 pb-8 mt-20 ${isAdmin ? 'lg:ml-64' : ''}`}>
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 mb-12">
           {/* Brand & About */}
           <div>
             <Link href="/" className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600 mb-4 inline-block">
@@ -79,7 +79,27 @@ export default function Footer({ settings }: FooterProps) {
               <li><Link href="/about" className="hover:text-blue-400 transition-colors">Rólunk</Link></li>
               <li><Link href="/contact" className="hover:text-blue-400 transition-colors">Kapcsolat</Link></li>
               <li><Link href="/faq" className="hover:text-blue-400 transition-colors">GYIK</Link></li>
-              <li><Link href="/terms" className="hover:text-blue-400 transition-colors">ÁSZF</Link></li>
+            </ul>
+          </div>
+
+          {/* Legal Links */}
+          <div>
+            <h3 className="text-white font-bold mb-6">Jogi információk</h3>
+            <ul className="space-y-3 text-sm text-gray-400">
+              <li><Link href="/aszf" className="hover:text-blue-400 transition-colors">ÁSZF</Link></li>
+              <li><Link href="/adatkezeles" className="hover:text-blue-400 transition-colors">Adatkezelés</Link></li>
+              <li><Link href="/impresszum" className="hover:text-blue-400 transition-colors">Impresszum</Link></li>
+              <li><Link href="/privacy" className="hover:text-blue-400 transition-colors">Adatvédelem</Link></li>
+              <li>
+                <a 
+                  href="https://ec.europa.eu/consumers/odr" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="hover:text-blue-400 transition-colors"
+                >
+                  Online Vitarendezési Platform
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -139,10 +159,12 @@ export default function Footer({ settings }: FooterProps) {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-          <p>&copy; {new Date().getFullYear()} NEXU Webshop. Minden jog fenntartva. (v1.0.2)</p>
+          <p>&copy; {new Date().getFullYear()} NEXU Webshop. Minden jog fenntartva.</p>
           <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-gray-300">Adatvédelem</Link>
-            <Link href="/cookies" className="hover:text-gray-300">Sütik</Link>
+            <Link href="/aszf" className="hover:text-gray-300">ÁSZF</Link>
+            <Link href="/adatkezeles" className="hover:text-gray-300">Adatkezelés</Link>
+            <Link href="/impresszum" className="hover:text-gray-300">Impresszum</Link>
+            <Link href="/privacy" className="hover:text-gray-300">Sütik</Link>
           </div>
         </div>
       </div>

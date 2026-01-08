@@ -221,6 +221,7 @@ model ProductVariant {
   productId Int
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   
+  slug      String?  // SEO-friendly URL slug (e.g., "256gb-fekete")
   attributes Json
   price     Int
   salePrice       Int?
@@ -237,6 +238,8 @@ model ProductVariant {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([productId, slug]) // Unique slug per product
 }
 
 model Attribute {

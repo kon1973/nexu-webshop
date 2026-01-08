@@ -1,8 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getRateLimitSetting, setRateLimitSetting } from './settingsService'
+
+// Mock server-only to avoid "This module cannot be imported from a Client Component" error
+vi.mock('server-only', () => ({}))
 
 vi.mock('./prisma', async () => {
   return { prisma: { setting: { findUnique: vi.fn(), upsert: vi.fn() }, settingAudit: { create: vi.fn() } } }
+})
+
+let getRateLimitSetting: any
+let setRateLimitSetting: any
+
+beforeEach(async () => {
+  const mod = await import('./settingsService')
+  getRateLimitSetting = mod.getRateLimitSetting
+  setRateLimitSetting = mod.setRateLimitSetting
 })
 
 describe('settingsService', () => {

@@ -4,12 +4,14 @@ import { useState, useEffect, useTransition, useCallback, useMemo, memo } from '
 import FilterPanel from './FilterPanel'
 import { useFavorites } from '@/context/FavoritesContext'
 import ProductCard from '@/app/components/ProductCard'
+import ProductCardList from '@/app/components/ProductCardList'
 import BannerCarousel from '@/app/components/BannerCarousel'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import type { Product, Banner, Category, Brand } from '@prisma/client'
-import { SearchX, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { SearchX, X, ChevronLeft, ChevronRight, Loader2, LayoutGrid, List } from 'lucide-react'
 import RecentlyViewed from '@/app/components/RecentlyViewed'
 import type { SelectedSpec } from './SpecificationFilters'
+import { getSiteUrl } from '@/lib/site'
 
 type ProductWithVariants = Product & {
   variants: { id: string }[]
@@ -45,6 +47,20 @@ export default function ShopClient({
   const [isPending, startTransition] = useTransition()
   
   const { favorites } = useFavorites()
+
+  // View mode state (grid or list)
+  type ViewMode = 'grid' | 'list'
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('nexu-view-mode') as ViewMode) || 'grid'
+    }
+    return 'grid'
+  })
+
+  // Save view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('nexu-view-mode', viewMode)
+  }, [viewMode])
 
   // Local state for UI inputs (debouncing etc)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
@@ -185,8 +201,114 @@ export default function ShopClient({
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
+  // Generate structured data for product listing
+  const siteUrl = getSiteUrl()
+  
+  // CollectionPage schema for category/search results
+  const collectionJsonLd = useMemo(() => {
+    const pageUrl = currentCategory 
+      ? `${siteUrl}/shop?category=${currentCategory.slug}`
+      : `${siteUrl}/shop`
+    
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: currentCategory?.name || 'Összes termék',
+      description: currentCategory?.description || 'Böngéssz a NEXU Store termékei között',
+      url: pageUrl,
+      isPartOf: {
+        '@type': 'WebSite',
+        name: 'NEXU Store',
+        url: siteUrl
+      },
+      mainEntity: {
+        '@type': 'ItemList',
+        numberOfItems: totalCount,
+        itemListElement: products.slice(0, 20).map((product, index) => ({
+          '@type': 'ListItem',
+          position: (currentPage - 1) * 24 + index + 1,
+          item: {
+            '@type': 'Product',
+            name: product.name,
+            url: `${siteUrl}/shop/${product.slug || product.id}`,
+            image: product.images?.[0]?.startsWith('http') 
+              ? product.images[0] 
+              : `${siteUrl}${product.images?.[0] || ''}`,
+            ...(product.gtin && { gtin: product.gtin }),
+            ...(product.sku && { sku: product.sku }),
+            offers: {
+              '@type': 'Offer',
+              priceCurrency: 'HUF',
+              price: product.salePrice || product.price,
+              availability: product.stock > 0 
+                ? 'https://schema.org/InStock' 
+                : 'https://schema.org/OutOfStock'
+            },
+            ...(product.rating > 0 && {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                ratingValue: product.rating,
+                reviewCount: product._count?.reviews || 0
+              }
+            })
+          }
+        }))
+      }
+    }
+  }, [products, currentCategory, currentPage, totalCount, siteUrl])
+
+  // Breadcrumb for shop/category pages
+  const breadcrumbJsonLd = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Kezdőlap', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Termékek', item: `${siteUrl}/shop` },
+      ...(currentCategory ? [{
+        '@type': 'ListItem',
+        position: 3,
+        name: currentCategory.name,
+        item: `${siteUrl}/shop?category=${currentCategory.slug}`
+      }] : [])
+    ]
+  }), [currentCategory, siteUrl])
+
+  // Event schema for current sales / promotions (when sale-priced items exist)
+  const saleEventJsonLd = useMemo(() => {
+    const now = new Date()
+    const saleProducts = products.filter(p => p.salePrice && (!p.saleStartDate || new Date(p.saleStartDate) <= now) && (!p.saleEndDate || new Date(p.saleEndDate) >= now))
+    if (!saleProducts || saleProducts.length === 0) return null
+
+    const startDates = saleProducts.map(p => p.saleStartDate).filter(Boolean).map((d: any) => new Date(d))
+    const endDates = saleProducts.map(p => p.saleEndDate).filter(Boolean).map((d: any) => new Date(d))
+
+    const startDate = startDates.length ? new Date(Math.min(...startDates.map(d => d.getTime()))).toISOString() : undefined
+    const endDate = endDates.length ? new Date(Math.max(...endDates.map(d => d.getTime()))).toISOString() : undefined
+
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'Event',
+      name: 'NEXU Akciók',
+      description: 'Kedvezményes ajánlatok és leárazások a NEXU Store-ban.',
+      ...(startDate && { startDate }),
+      ...(endDate && { endDate }),
+      location: { '@type': 'Place', name: 'NEXU Webshop', url: siteUrl },
+      eventStatus: 'https://schema.org/EventScheduled',
+      offers: saleProducts.slice(0, 5).map(p => ({
+        '@type': 'Offer',
+        url: `${siteUrl}/shop/${p.slug || p.id}`,
+        price: p.salePrice || p.price,
+        priceCurrency: 'HUF'
+      }))
+    }
+  }, [products, siteUrl])
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-purple-500/30">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }} />
+      {saleEventJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(saleEventJsonLd) }} />}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-[#0a0a0a] border-b border-white/5">
         <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
@@ -210,11 +332,11 @@ export default function ShopClient({
           
           {currentCategory?.description ? (
             <div 
-              className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed prose prose-invert prose-p:text-gray-400 prose-headings:text-white"
+              className="text-sm md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed prose prose-invert prose-p:text-gray-400 prose-headings:text-white"
               dangerouslySetInnerHTML={{ __html: currentCategory.description }}
             />
           ) : (
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-sm md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed hidden md:block">
               Fedezd fel a legújabb technológiai innovációkat. Prémium minőség, villámgyors szállítás és szakértő támogatás.
             </p>
           )}
@@ -222,15 +344,15 @@ export default function ShopClient({
       </div>
 
       {banners.length > 0 && (
-        <div className="container mx-auto px-4 -mt-12 relative z-20 mb-16">
-          <div className="rounded-2xl overflow-hidden shadow-2xl shadow-purple-500/10 border border-white/10">
+        <div className="container mx-auto px-4 -mt-6 md:-mt-12 relative z-20 mb-8 md:mb-16">
+          <div className="rounded-xl md:rounded-2xl overflow-hidden shadow-2xl shadow-purple-500/10 border border-white/10">
             <BannerCarousel banners={banners} />
           </div>
         </div>
       )}
 
-      <div className="container mx-auto px-4 pb-32 lg:pb-24 pt-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+      <div className="container mx-auto px-3 md:px-4 pb-24 lg:pb-24 pt-4 md:pt-8">
+        <div className="flex flex-col lg:flex-row gap-4 md:gap-8">
           {/* Desktop Filter Sidebar */}
           <aside className="w-full lg:w-72 flex-shrink-0 hidden lg:block">
             <div className="sticky top-24 space-y-8">
@@ -269,7 +391,7 @@ export default function ShopClient({
           </aside>
 
           <main className="flex-grow">
-            {/* Mobile header with category and count */}
+            {/* Header with category, count and view switcher */}
             <div className="flex items-center justify-between mb-4 md:mb-6">
               <h2 className="text-lg md:text-2xl font-bold text-white flex items-center gap-2 md:gap-3 flex-wrap">
                 {currentCategory?.name || 'Összes termék'}
@@ -277,6 +399,34 @@ export default function ShopClient({
                   {totalCount} termék
                 </span>
               </h2>
+              
+              {/* View Mode Switcher */}
+              <div className="hidden sm:flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/10">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-md transition-all ${
+                    viewMode === 'grid'
+                      ? 'bg-purple-600 text-white shadow-lg'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                  aria-label="Rácsnézet"
+                  title="Rácsnézet"
+                >
+                  <LayoutGrid size={18} />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-md transition-all ${
+                    viewMode === 'list'
+                      ? 'bg-purple-600 text-white shadow-lg'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                  aria-label="Listanézet"
+                  title="Listanézet"
+                >
+                  <List size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Active filters on mobile */}
@@ -396,29 +546,59 @@ export default function ShopClient({
                 </div>
               )}
               
-              <div className={`grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 transition-opacity duration-200 ${isPending ? 'opacity-50' : 'opacity-100'}`}>
-                {products.map((product, index) => (
-                  <ProductCard key={product.id} product={product} priority={index < 4} />
-                ))}
+              {/* Grid View */}
+              {viewMode === 'grid' && (
+                <div className={`grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-1.5 sm:gap-2 md:gap-6 transition-opacity duration-200 ${isPending ? 'opacity-50' : 'opacity-100'}`}>
+                  {products.map((product, index) => (
+                    <ProductCard key={product.id} product={product} priority={index < 4} />
+                  ))}
 
-                {products.length === 0 && !isPending && (
-                  <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24 text-center bg-[#121212] rounded-2xl md:rounded-3xl border border-white/5 border-dashed">
-                    <div className="w-16 md:w-24 h-16 md:h-24 bg-white/5 rounded-full flex items-center justify-center mb-4 md:mb-6 animate-pulse">
-                      <SearchX size={32} className="md:w-12 md:h-12 text-gray-500" />
+                  {products.length === 0 && !isPending && (
+                    <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24 text-center bg-[#121212] rounded-2xl md:rounded-3xl border border-white/5 border-dashed">
+                      <div className="w-16 md:w-24 h-16 md:h-24 bg-white/5 rounded-full flex items-center justify-center mb-4 md:mb-6 animate-pulse">
+                        <SearchX size={32} className="md:w-12 md:h-12 text-gray-500" />
+                      </div>
+                      <h3 className="text-xl md:text-2xl font-bold text-white mb-2 md:mb-3">Nincs találat</h3>
+                      <p className="text-sm md:text-lg text-gray-400 max-w-md mb-6 md:mb-8 px-4">
+                        Sajnos nem találtunk a keresési feltételeknek megfelelő terméket.
+                      </p>
+                      <button
+                        onClick={handleReset}
+                        className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all text-sm md:text-base"
+                      >
+                        <X size={18} /> Szűrők törlése
+                      </button>
                     </div>
-                    <h3 className="text-xl md:text-2xl font-bold text-white mb-2 md:mb-3">Nincs találat</h3>
-                    <p className="text-sm md:text-lg text-gray-400 max-w-md mb-6 md:mb-8 px-4">
-                      Sajnos nem találtunk a keresési feltételeknek megfelelő terméket.
-                    </p>
-                    <button
-                      onClick={handleReset}
-                      className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all text-sm md:text-base"
-                    >
-                      <X size={18} /> Szűrők törlése
-                    </button>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
+
+              {/* List View */}
+              {viewMode === 'list' && (
+                <div className={`flex flex-col gap-3 md:gap-4 transition-opacity duration-200 ${isPending ? 'opacity-50' : 'opacity-100'}`}>
+                  {products.map((product, index) => (
+                    <ProductCardList key={product.id} product={product} priority={index < 4} />
+                  ))}
+
+                  {products.length === 0 && !isPending && (
+                    <div className="flex flex-col items-center justify-center py-16 md:py-24 text-center bg-[#121212] rounded-2xl md:rounded-3xl border border-white/5 border-dashed">
+                      <div className="w-16 md:w-24 h-16 md:h-24 bg-white/5 rounded-full flex items-center justify-center mb-4 md:mb-6 animate-pulse">
+                        <SearchX size={32} className="md:w-12 md:h-12 text-gray-500" />
+                      </div>
+                      <h3 className="text-xl md:text-2xl font-bold text-white mb-2 md:mb-3">Nincs találat</h3>
+                      <p className="text-sm md:text-lg text-gray-400 max-w-md mb-6 md:mb-8 px-4">
+                        Sajnos nem találtunk a keresési feltételeknek megfelelő terméket.
+                      </p>
+                      <button
+                        onClick={handleReset}
+                        className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all text-sm md:text-base"
+                      >
+                        <X size={18} /> Szűrők törlése
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Pagination */}

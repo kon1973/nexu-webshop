@@ -23,11 +23,14 @@ interface ProductCardProps {
   product: Product & { 
     variants?: { id: string }[]
     _count?: { reviews: number }
+    slug?: string | null
   }
   priority?: boolean
 }
 
 const ProductCard = memo(function ProductCard({ product, priority = false }: ProductCardProps) {
+  // Use slug for SEO-friendly URLs, fallback to ID
+  const productUrl = `/shop/${product.slug || product.id}`
   const { addToCart, openCart } = useCart()
   const { addToCompare, removeFromCompare, isInCompare } = useCompare()
   const router = useRouter()
@@ -113,7 +116,7 @@ const ProductCard = memo(function ProductCard({ product, priority = false }: Pro
         className="group relative bg-[#0a0a0a] rounded-2xl md:rounded-3xl border border-white/5 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 overflow-hidden flex flex-col h-full md:hover:-translate-y-2"
         aria-label={`${product.name} - ${currentPrice?.toLocaleString('hu-HU')} Ft`}
       >
-        <Link href={`/shop/${product.id}`} className="block relative" aria-label={`${product.name} részletei`}>
+        <Link href={productUrl} className="block relative" aria-label={`${product.name} részletei`}>
           <div className="relative aspect-square bg-gradient-to-br from-[#1a1a1a] to-[#050505] flex items-center justify-center overflow-hidden p-3 md:p-8 group-hover:from-[#222] group-hover:to-[#0a0a0a] transition-colors duration-500">
             
             <div className="w-full h-full flex items-center justify-center transform group-hover:scale-110 transition-all duration-500 drop-shadow-2xl filter group-hover:brightness-110">
@@ -222,7 +225,13 @@ const ProductCard = memo(function ProductCard({ product, priority = false }: Pro
         <div className="p-3 md:p-6 flex flex-col flex-grow relative z-10">
           {/* Category & Rating row */}
           <div className="mb-1 md:mb-2 flex items-center justify-between">
-            <span className="text-[10px] md:text-xs font-medium text-purple-400 uppercase tracking-wider truncate max-w-[60%]">{product.category}</span>
+            <Link 
+              href={`/shop?category=${encodeURIComponent(product.category)}`}
+              className="text-[10px] md:text-xs font-medium text-purple-400 uppercase tracking-wider truncate max-w-[60%] hover:text-purple-300 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {product.category}
+            </Link>
             <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0">
               <Star size={10} className="md:w-3 md:h-3 text-yellow-400 fill-yellow-400" />
               <span className="text-[10px] md:text-xs font-bold text-white">{product.rating.toFixed(1)}</span>
@@ -231,7 +240,7 @@ const ProductCard = memo(function ProductCard({ product, priority = false }: Pro
           </div>
 
           {/* Product name */}
-          <Link href={`/shop/${product.id}`} className="group-hover:text-purple-400 transition-colors duration-300">
+          <Link href={productUrl} className="group-hover:text-purple-400 transition-colors duration-300">
             <h3 className="text-sm md:text-lg font-bold text-white mb-1 md:mb-2 line-clamp-2 leading-tight">{product.name}</h3>
           </Link>
           

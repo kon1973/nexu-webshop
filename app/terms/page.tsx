@@ -1,8 +1,25 @@
 import type { Metadata } from 'next'
+import { getSiteUrl } from '@/lib/site'
+
+const siteUrl = getSiteUrl()
 
 export const metadata: Metadata = {
   title: 'Általános Szerződési Feltételek - NEXU Webshop',
   description: 'A NEXU Webshop használatának feltételei.',
+  alternates: { canonical: `${siteUrl}/terms` },
+  openGraph: {
+    title: 'Szerződési Feltételek | NEXU Webshop',
+    description: 'A NEXU Webshop használatának feltételei.',
+    url: `${siteUrl}/terms`,
+    siteName: 'NEXU Webshop',
+    locale: 'hu_HU',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Szerződési Feltételek | NEXU Webshop',
+    description: 'A NEXU Webshop használatának feltételei.',
+  },
 }
 
 export default function TermsPage() {

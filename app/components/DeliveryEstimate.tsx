@@ -257,7 +257,7 @@ export function OrderProgress({
         {/* Progress line */}
         <div className="absolute top-5 left-5 right-5 h-0.5 bg-white/10">
           <div
-            className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-500"
+            className="h-full bg-gradient-to-r from-blue-400 to-purple-600 transition-all duration-500"
             style={{ width: `${(currentIndex / (STATUS_STEPS.length - 1)) * 100}%` }}
           />
         </div>
@@ -275,7 +275,7 @@ export function OrderProgress({
                   className={cn(
                     'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 relative z-10',
                     isCompleted
-                      ? 'bg-gradient-to-br from-purple-500 to-blue-500 shadow-lg shadow-purple-500/30'
+                      ? 'bg-gradient-to-br from-blue-400 to-purple-600 shadow-lg shadow-purple-500/30'
                       : 'bg-[#1a1a1a] border border-white/10',
                     isCurrent && 'ring-4 ring-purple-500/30 animate-pulse'
                   )}

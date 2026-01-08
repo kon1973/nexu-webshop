@@ -17,6 +17,8 @@ interface CheckoutFormProps {
   saveAddress: boolean
   clientSecret: string
   onSuccess: (orderId: string) => void
+  acceptedTerms: boolean
+  setAcceptedTerms: (value: boolean) => void
 }
 
 export default function CheckoutForm({ 
@@ -29,7 +31,9 @@ export default function CheckoutForm({
   discountAmount, 
   saveAddress,
   clientSecret,
-  onSuccess 
+  onSuccess,
+  acceptedTerms,
+  setAcceptedTerms
 }: CheckoutFormProps) {
   const stripe = useStripe()
   const elements = useElements()
@@ -143,8 +147,42 @@ export default function CheckoutForm({
     <form id="payment-form" onSubmit={handleSubmit} className="mt-4">
       <PaymentElement id="payment-element" options={{ layout: 'tabs' }} />
       {message && <div id="payment-message" className="text-red-500 mt-2 text-sm">{message}</div>}
+      
+      {/* Jogi checkbox - ÁSZF és Adatkezelés elfogadása */}
+      <div className="flex items-start gap-3 p-4 mt-6 bg-gradient-to-br from-blue-600/5 to-purple-600/5 rounded-xl border border-white/10">
+        <input
+          type="checkbox"
+          id="acceptTermsStripe"
+          required
+          checked={acceptedTerms}
+          onChange={(e) => setAcceptedTerms(e.target.checked)}
+          className="w-5 h-5 mt-0.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-[#0a0a0a] cursor-pointer"
+        />
+        <label htmlFor="acceptTermsStripe" className="text-sm text-gray-300 cursor-pointer select-none leading-relaxed">
+          Elolvastam és elfogadom az{' '}
+          <a 
+            href="/aszf" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline font-semibold"
+          >
+            ÁSZF-et
+          </a>
+          {' '}és az{' '}
+          <a 
+            href="/adatkezeles" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline font-semibold"
+          >
+            Adatkezelési Tájékoztatót
+          </a>
+          . <span className="text-red-400">*</span>
+        </label>
+      </div>
+      
       <button
-        disabled={isLoading || !stripe || !elements}
+        disabled={isLoading || !stripe || !elements || !acceptedTerms}
         id="submit"
         className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >

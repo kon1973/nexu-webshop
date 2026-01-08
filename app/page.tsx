@@ -7,9 +7,17 @@ import ProductCard from './components/ProductCard'
 import NewsletterSection from './components/NewsletterSection'
 import BrandMarquee from './components/BrandMarquee'
 import LatestNews from './components/LatestNews'
-import CustomerReviews from './components/CustomerReviews'
-import { getSettings, getBanners, getCategories, getFeaturedProducts, getNewArrivals, getPromoBanner, getLatestBlogPosts, getLatestReviews } from '@/lib/cache'
+import FlashSaleSection from './components/FlashSaleSection'
+import { getSettings, getBanners, getCategories, getFeaturedProducts, getNewArrivals, getPromoBanner, getLatestBlogPosts, getFlashSaleProducts } from '@/lib/cache'
 import { getImageUrl } from '@/lib/image'
+import { getSiteUrl } from '@/lib/site'
+import type { Metadata } from 'next'
+
+const siteUrl = getSiteUrl()
+
+export const metadata: Metadata = {
+  alternates: { canonical: siteUrl },
+}
 
 export default async function HomePage() {
   const settings = await getSettings()
@@ -22,7 +30,7 @@ export default async function HomePage() {
           <div className="w-24 h-24 bg-purple-500/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
             <Zap className="text-purple-500" size={48} />
           </div>
-          <h1 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500">
+          <h1 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
             Karbantartás alatt
           </h1>
           <p className="text-gray-400 max-w-md text-lg">
@@ -41,7 +49,7 @@ export default async function HomePage() {
   const featuredProducts = await getFeaturedProducts()
   const newArrivals = await getNewArrivals()
   const latestPosts = await getLatestBlogPosts()
-  const latestReviews = await getLatestReviews()
+  const flashSaleProducts = await getFlashSaleProducts()
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-purple-500/30">
@@ -187,6 +195,9 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* Flash Sale Section */}
+      <FlashSaleSection products={flashSaleProducts} />
+
       <BrandMarquee />
 
       <section id="categories" className="py-20 bg-[#0f0f0f]">
@@ -311,7 +322,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <CustomerReviews reviews={latestReviews} />
       <LatestNews posts={latestPosts} />
       <NewsletterSection />
     </div>

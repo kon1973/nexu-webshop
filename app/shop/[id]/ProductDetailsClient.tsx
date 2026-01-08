@@ -45,6 +45,7 @@ type ProductWithDetails = Product & {
 }
 
 const colorMap: Record<string, string> = {
+  // Basic colors
   'Fekete': '#1a1a1a',
   'Fehér': '#ffffff',
   'Ezüst': '#e0e0e0',
@@ -58,12 +59,38 @@ const colorMap: Record<string, string> = {
   'Lila': '#a855f7',
   'Barna': '#78350f',
   'Narancs': '#f97316',
+  // Brand-specific colors
   'Éjfekete': '#1e293b',
   'Csillagfény': '#f8fafc',
   'Asztroszürke': '#4b5563',
   'Grafit': '#374151',
   'Sierra kék': '#93c5fd',
   'Alpesi zöld': '#166534',
+  // iPhone/Apple colors
+  'Titánszürke': '#8E8E93',
+  'Titánfekete': '#3A3A3C',
+  'Természetes titán': '#9A9A9D',
+  'Sivatagi titán': '#C2B59B',
+  'Kék titán': '#4A6E8B',
+  'Éjkék': '#1d3557',
+  'Mélylila': '#5B21B6',
+  'Korallpiros': '#FF6B6B',
+  'Mentazöld': '#10B981',
+  // Samsung colors
+  'Fantomfekete': '#1C1C1E',
+  'Fantomfehér': '#F5F5F7',
+  'Fantomezüst': '#D1D1D6',
+  'Krémfehér': '#FFF8E7',
+  'Levendula': '#E6E6FA',
+  'Borostyán sárga': '#FFB000',
+  'Olívazöld': '#708238',
+  'Ködszürke': '#B0B0B0',
+  'Tengerkék': '#006994',
+  // Generic tech colors
+  'Kozmoszfekete': '#0D0D0D',
+  'Holdezüst': '#C0C0C0',
+  'Rózsaarany': '#B76E79',
+  'Gyöngyház': '#EAE0C8',
 }
 
 export default function ProductDetailsClient({ product, url }: { product: ProductWithDetails; url: string }) {
@@ -148,6 +175,42 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
       const vAttrs = v.attributes as Record<string, string>
       return Object.entries(selectedOptions).every(([key, val]) => vAttrs[key] === val)
     })
+  }, [product.variants, selectedOptions, attributes])
+
+  // Get available values for each option based on current selections
+  const getAvailableValues = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) return {}
+    
+    const availability: Record<string, Record<string, { available: boolean; inStock: boolean; priceRange?: { min: number; max: number }; image?: string }>> = {}
+    
+    attributes.forEach((attr: ProductOption) => {
+      availability[attr.name] = {}
+      attr.values.forEach(val => {
+        // Check if this value is available given other selections
+        const otherSelections = Object.entries(selectedOptions).filter(([k]) => k !== attr.name)
+        
+        const matchingVariants = product.variants.filter((v: ProductVariant) => {
+          const vAttrs = v.attributes as Record<string, string>
+          // Must match this value
+          if (vAttrs[attr.name] !== val) return false
+          // Must match all other selections
+          return otherSelections.every(([k, selectedVal]) => vAttrs[k] === selectedVal)
+        })
+        
+        const hasStock = matchingVariants.some((v: ProductVariant) => v.stock > 0)
+        const prices = matchingVariants.map((v: ProductVariant) => v.salePrice || v.price)
+        const image = matchingVariants[0]?.images?.[0]
+        
+        availability[attr.name][val] = {
+          available: matchingVariants.length > 0,
+          inStock: hasStock,
+          priceRange: prices.length > 0 ? { min: Math.min(...prices), max: Math.max(...prices) } : undefined,
+          image: image
+        }
+      })
+    })
+    
+    return availability
   }, [product.variants, selectedOptions, attributes])
 
   const now = new Date()
@@ -387,7 +450,7 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
                 }`}
               >
                 {getImageUrl(img) ? (
-                  <Image src={getImageUrl(img)!} alt="" fill className="object-cover" sizes="100px" />
+                  <Image src={getImageUrl(img)!} alt={`${product.name} - ${idx + 1}. kép`} fill className="object-cover" sizes="100px" />
                 ) : (
                   <div className="w-full h-full bg-[#121212] flex items-center justify-center text-2xl">
                     <Package size={24} className="text-gray-500" />
@@ -417,9 +480,12 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
       <div className="space-y-8">
         <div>
           <div className="flex items-center justify-between mb-4">
-            <span className="text-purple-400 text-sm font-bold tracking-wider uppercase bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
+            <a 
+              href={`/shop?category=${encodeURIComponent(product.category)}`}
+              className="text-purple-400 text-sm font-bold tracking-wider uppercase bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
+            >
               {product.category}
-            </span>
+            </a>
             <div className="flex gap-2">
               <ShareButton url={url} title={product.name} text={product.description || product.name} />
               <FavoriteButton product={product} />
@@ -485,65 +551,223 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
 
         {/* Options / Variants */}
         {attributes.length > 0 && (
-          <div className="space-y-6 border-t border-white/10 pt-6">
-            {attributes.map((opt: ProductOption) => {
+          <div data-variant-section className="space-y-6 border-t border-white/10 pt-6">
+            {attributes.map((opt: ProductOption, optIndex: number) => {
               const isColor = opt.name.toLowerCase() === 'szín' || opt.name.toLowerCase() === 'color'
+              const isSize = opt.name.toLowerCase() === 'méret' || opt.name.toLowerCase() === 'size' || opt.name.toLowerCase() === 'tárhely' || opt.name.toLowerCase() === 'storage'
+              const optAvailability = getAvailableValues[opt.name] || {}
               
               return (
-                <div key={opt.id}>
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider">{opt.name}</h3>
+                <div key={opt.id} className="animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${optIndex * 100}ms` }}>
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider">{opt.name}</h3>
+                      {!selectedOptions[opt.name] && (
+                        <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full border border-yellow-500/20">
+                          Válassz!
+                        </span>
+                      )}
+                    </div>
                     {selectedOptions[opt.name] && (
-                      <span className="text-sm text-purple-400 font-medium">{selectedOptions[opt.name]}</span>
+                      <span className="text-sm font-medium px-3 py-1 bg-purple-500/10 text-purple-400 rounded-lg border border-purple-500/20">
+                        {selectedOptions[opt.name]}
+                      </span>
                     )}
                   </div>
                   
-                  <div className="flex flex-wrap gap-3">
-                    {opt.values.map((val) => {
-                      const isSelected = selectedOptions[opt.name] === val
-                      const colorHex = colorMap[val]
-                      
-                      if (isColor && colorHex) {
+                  {/* Color swatches with enhanced UI */}
+                  {isColor ? (
+                    <div className="flex flex-wrap gap-3">
+                      {opt.values.map((val) => {
+                        const isSelected = selectedOptions[opt.name] === val
+                        const colorHex = colorMap[val] || '#808080'
+                        const availability = optAvailability[val]
+                        const isAvailable = availability?.available !== false
+                        const isInStock = availability?.inStock !== false
+                        
+                        return (
+                          <div key={val} className="relative group">
+                            <button
+                              onClick={() => isAvailable && handleOptionSelect(opt.name, val)}
+                              disabled={!isAvailable}
+                              className={`w-12 h-12 rounded-full border-2 transition-all relative ${
+                                isSelected
+                                  ? 'border-purple-500 scale-110 shadow-[0_0_15px_rgba(168,85,247,0.5)] ring-2 ring-purple-500/30 ring-offset-2 ring-offset-[#0a0a0a]'
+                                  : isAvailable
+                                    ? 'border-white/20 hover:border-white/50 hover:scale-105'
+                                    : 'border-white/5 opacity-30 cursor-not-allowed'
+                              }`}
+                              style={{ backgroundColor: colorHex }}
+                            >
+                              {(val === 'Fehér' || val === 'Csillagfény') && (
+                                <div className="absolute inset-0 rounded-full border border-black/10" />
+                              )}
+                              {isSelected && (
+                                <div className={`absolute inset-0 flex items-center justify-center ${val === 'Fehér' || val === 'Csillagfény' ? 'text-black' : 'text-white'}`}>
+                                  <Check size={18} strokeWidth={3} />
+                                </div>
+                              )}
+                              {!isInStock && isAvailable && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-full h-0.5 bg-red-500 rotate-45 absolute" />
+                                </div>
+                              )}
+                            </button>
+                            
+                            {/* Tooltip with name, price, and preview */}
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-20">
+                              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3 shadow-xl min-w-[120px] text-center">
+                                {availability?.image && (
+                                  <div className="w-16 h-16 mx-auto mb-2 rounded-lg overflow-hidden bg-[#0a0a0a]">
+                                    <Image 
+                                      src={getImageUrl(availability.image) || ''} 
+                                      alt={val} 
+                                      width={64} 
+                                      height={64} 
+                                      className="object-contain w-full h-full"
+                                    />
+                                  </div>
+                                )}
+                                <p className="text-white font-medium text-sm">{val}</p>
+                                {!isInStock && isAvailable && (
+                                  <p className="text-red-400 text-xs mt-1">Nincs készleten</p>
+                                )}
+                                {availability?.priceRange && (
+                                  <p className="text-gray-400 text-xs mt-1">
+                                    {availability.priceRange.min === availability.priceRange.max 
+                                      ? `${availability.priceRange.min.toLocaleString('hu-HU')} Ft`
+                                      : `${availability.priceRange.min.toLocaleString('hu-HU')} - ${availability.priceRange.max.toLocaleString('hu-HU')} Ft`
+                                    }
+                                  </p>
+                                )}
+                                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full">
+                                  <div className="border-8 border-transparent border-t-[#1a1a1a]" />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : isSize ? (
+                    /* Size/Storage grid layout */
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      {opt.values.map((val) => {
+                        const isSelected = selectedOptions[opt.name] === val
+                        const availability = optAvailability[val]
+                        const isAvailable = availability?.available !== false
+                        const isInStock = availability?.inStock !== false
+                        const price = availability?.priceRange?.min
+                        
                         return (
                           <button
                             key={val}
-                            onClick={() => handleOptionSelect(opt.name, val)}
-                            className={`w-10 h-10 rounded-full border-2 transition-all relative group ${
+                            onClick={() => isAvailable && handleOptionSelect(opt.name, val)}
+                            disabled={!isAvailable}
+                            className={`relative p-3 rounded-xl border-2 font-medium transition-all text-left ${
                               isSelected
-                                ? 'border-purple-500 scale-110 shadow-[0_0_10px_rgba(168,85,247,0.5)]'
-                                : 'border-white/10 hover:border-white/50 hover:scale-105'
+                                ? 'border-purple-500 bg-purple-500/10 shadow-[0_0_20px_rgba(168,85,247,0.3)] ring-1 ring-purple-500/30'
+                                : isAvailable
+                                  ? isInStock
+                                    ? 'border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10'
+                                    : 'border-white/5 bg-white/[0.02] hover:border-white/10'
+                                  : 'border-white/5 bg-white/[0.02] opacity-40 cursor-not-allowed'
                             }`}
-                            title={val}
-                            style={{ backgroundColor: colorHex }}
                           >
-                            {val === 'Fehér' && <div className="absolute inset-0 rounded-full border border-black/10" />}
+                            <div className="flex flex-col gap-1">
+                              <span className={`font-bold ${isSelected ? 'text-white' : isAvailable ? 'text-gray-200' : 'text-gray-500'}`}>
+                                {val}
+                              </span>
+                              {price && price !== product.price && (
+                                <span className={`text-xs ${price > product.price ? 'text-amber-400' : 'text-green-400'}`}>
+                                  {price > product.price ? '+' : ''}{(price - product.price).toLocaleString('hu-HU')} Ft
+                                </span>
+                              )}
+                              {!isInStock && isAvailable && (
+                                <span className="text-xs text-red-400">Elfogyott</span>
+                              )}
+                            </div>
                             {isSelected && (
-                              <div className={`absolute inset-0 flex items-center justify-center ${val === 'Fehér' || val === 'Csillagfény' ? 'text-black' : 'text-white'}`}>
-                                <Check size={16} strokeWidth={3} />
+                              <div className="absolute top-2 right-2">
+                                <Check size={16} className="text-purple-400" />
                               </div>
                             )}
                           </button>
                         )
-                      }
-
-                      return (
-                        <button
-                          key={val}
-                          onClick={() => handleOptionSelect(opt.name, val)}
-                          className={`px-6 py-2 rounded-xl border-2 font-medium transition-all ${
-                            isSelected
-                              ? 'border-purple-500 bg-purple-500/10 text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                              : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white bg-white/5'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      )
-                    })}
-                  </div>
+                      })}
+                    </div>
+                  ) : (
+                    /* Default button layout for other options */
+                    <div className="flex flex-wrap gap-2">
+                      {opt.values.map((val) => {
+                        const isSelected = selectedOptions[opt.name] === val
+                        const availability = optAvailability[val]
+                        const isAvailable = availability?.available !== false
+                        const isInStock = availability?.inStock !== false
+                        
+                        return (
+                          <button
+                            key={val}
+                            onClick={() => isAvailable && handleOptionSelect(opt.name, val)}
+                            disabled={!isAvailable}
+                            className={`px-5 py-2.5 rounded-xl border-2 font-medium transition-all flex items-center gap-2 ${
+                              isSelected
+                                ? 'border-purple-500 bg-purple-500/10 text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
+                                : isAvailable
+                                  ? isInStock
+                                    ? 'border-white/10 text-gray-300 hover:border-white/30 hover:text-white bg-white/5'
+                                    : 'border-white/5 text-gray-500 bg-white/[0.02]'
+                                  : 'border-white/5 text-gray-600 bg-white/[0.02] opacity-40 cursor-not-allowed line-through'
+                            }`}
+                          >
+                            {val}
+                            {!isInStock && isAvailable && (
+                              <span className="text-xs text-red-400 font-normal">(0 db)</span>
+                            )}
+                            {isSelected && <Check size={14} className="text-purple-400" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}
+            
+            {/* Selected variant summary */}
+            {selectedVariant && (
+              <div className="mt-4 p-4 bg-gradient-to-r from-purple-500/5 to-blue-500/5 border border-white/10 rounded-xl animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {selectedVariant.images?.[0] && (
+                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#121212] border border-white/10">
+                        <Image 
+                          src={getImageUrl(selectedVariant.images[0]) || ''} 
+                          alt="Kiválasztott variáció" 
+                          width={48} 
+                          height={48} 
+                          className="object-contain w-full h-full"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm text-gray-400">Kiválasztott variáció</p>
+                      <p className="text-white font-medium">
+                        {Object.values(selectedOptions).join(' / ')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-white">
+                      {currentPrice?.toLocaleString('hu-HU')} Ft
+                    </p>
+                    <p className={`text-sm ${selectedVariant.stock > 0 ? selectedVariant.stock < 5 ? 'text-yellow-400' : 'text-green-400' : 'text-red-400'}`}>
+                      {selectedVariant.stock > 0 ? `${selectedVariant.stock} db készleten` : 'Nincs készleten'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -590,9 +814,17 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
           </div>
           
           {attributes.length > 0 && !allOptionsSelected && !isOutOfStock && (
-             <p className="text-yellow-400 text-sm font-medium text-center animate-pulse bg-yellow-400/10 p-2 rounded-lg border border-yellow-400/20">
-               Kérlek válassz a fenti opciók közül a vásárláshoz!
-             </p>
+             <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl">
+               <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                 <Package className="text-amber-400" size={20} />
+               </div>
+               <div>
+                 <p className="text-amber-400 font-medium">Válassz variációt!</p>
+                 <p className="text-amber-400/70 text-sm">
+                   {attributes.filter((a: ProductOption) => !selectedOptions[a.name]).map((a: ProductOption) => a.name).join(', ')} opció(k) kiválasztása szükséges
+                 </p>
+               </div>
+             </div>
           )}
           
           {isOutOfStock && (
@@ -868,11 +1100,38 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
              </div>
              <div className="hidden md:block">
                <h3 className="font-bold text-white line-clamp-1">{product.name}</h3>
-               <p className="text-purple-400 font-bold">{(currentPrice ?? 0).toLocaleString('hu-HU')} Ft</p>
+               <div className="flex items-center gap-2">
+                 <p className="text-purple-400 font-bold">{(currentPrice ?? 0).toLocaleString('hu-HU')} Ft</p>
+                 {attributes.length > 0 && !allOptionsSelected && (
+                   <span className="text-xs text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                     Válassz variációt
+                   </span>
+                 )}
+                 {selectedVariant && (
+                   <span className="text-xs text-gray-400">
+                     {Object.values(selectedOptions).join(' · ')}
+                   </span>
+                 )}
+               </div>
              </div>
           </div>
           
           <div className="flex items-center gap-4">
+             {/* Show mini variant selector on mobile if not all selected */}
+             {attributes.length > 0 && !allOptionsSelected && (
+               <button
+                 onClick={() => {
+                   // Scroll to variants section
+                   const variantSection = document.querySelector('[data-variant-section]')
+                   variantSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                 }}
+                 className="sm:hidden flex items-center gap-2 px-3 py-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-400 text-sm font-medium"
+               >
+                 <Package size={16} />
+                 Válassz
+               </button>
+             )}
+             
              <div className="hidden sm:flex items-center bg-[#121212] border border-white/10 rounded-lg p-1">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -955,7 +1214,7 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
                       selectedImage === img ? 'border-purple-500 opacity-100' : 'border-transparent opacity-50 hover:opacity-100'
                     }`}
                   >
-                    <Image src={getImageUrl(img)!} alt="" fill className="object-cover" />
+                    <Image src={getImageUrl(img)!} alt={`${product.name} - ${idx + 1}. kép`} fill className="object-cover" />
                   </button>
                 ))}
              </div>

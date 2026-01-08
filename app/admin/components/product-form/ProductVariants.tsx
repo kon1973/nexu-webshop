@@ -18,6 +18,7 @@ type Variant = {
   saleEndDate?: string | null
   stock: number
   sku?: string
+  slug?: string
   image?: string
   description?: string
   isActive: boolean
@@ -87,18 +88,16 @@ export function ProductVariants({
               {variants.map((variant, idx) => (
                 <div key={variant.id} className="p-4 space-y-4">
                   {/* Main Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                    <div className="md:col-span-2">
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(variant.attributes).map(([key, val]) => (
-                          <span key={key} className="text-xs bg-white/5 px-2 py-1 rounded border border-white/10">
-                            <span className="text-gray-500">{key}:</span> {val}
-                          </span>
-                        ))}
-                      </div>
+                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+                    <div className="xl:col-span-12 flex flex-wrap gap-2 mb-2">
+                      {Object.entries(variant.attributes).map(([key, val]) => (
+                        <span key={key} className="text-xs bg-white/5 px-2 py-1 rounded border border-white/10">
+                          <span className="text-gray-500">{key}:</span> {val}
+                        </span>
+                      ))}
                     </div>
                     
-                    <div className="md:col-span-2">
+                    <div className="xl:col-span-2">
                       <label className="text-xs text-gray-500 block mb-1">Ár</label>
                       <input
                         type="number"
@@ -108,7 +107,7 @@ export function ProductVariants({
                       />
                     </div>
 
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-2 lg:col-span-1">
                       <label className="text-xs text-gray-500 block mb-1">Készlet</label>
                       <input
                         type="number"
@@ -118,7 +117,7 @@ export function ProductVariants({
                       />
                     </div>
 
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-2 lg:col-span-2">
                       <label className="text-xs text-gray-500 block mb-1">SKU</label>
                       <input
                         type="text"
@@ -128,7 +127,18 @@ export function ProductVariants({
                       />
                     </div>
 
-                    <div className="md:col-span-3">
+                    <div className="md:col-span-3 lg:col-span-3">
+                      <label className="text-xs text-gray-500 block mb-1">URL Slug <span className="text-gray-600">(SEO)</span></label>
+                      <input
+                        type="text"
+                        value={variant.slug || ''}
+                        onChange={(e) => updateVariant(idx, 'slug', e.target.value)}
+                        placeholder="pl: 256gb-fekete"
+                        className="w-full bg-[#0a0a0a] border border-white/10 rounded p-2 text-sm font-mono text-purple-400"
+                      />
+                    </div>
+
+                    <div className="md:col-span-3 lg:col-span-2">
                       <label className="text-xs text-gray-500 block mb-1">Kép</label>
                       <div className="flex items-center gap-2">
                         {variant.image ? (
@@ -168,7 +178,7 @@ export function ProductVariants({
                       </div>
                     </div>
 
-                    <div className="md:col-span-1 flex items-center justify-end gap-2 pt-6">
+                    <div className="md:col-span-2 lg:col-span-2 flex items-center justify-end gap-2 pt-6">
                       <label className="flex items-center gap-2 cursor-pointer" title="Aktív">
                         <input
                           type="checkbox"

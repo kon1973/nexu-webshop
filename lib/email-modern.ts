@@ -142,3 +142,33 @@ export async function sendModernOrderEmail(args: SendModernOrderEmailArgs) {
     return { success: false, error }
   }
 }
+
+export type SendAdminEmailArgs = {
+  to: string
+  subject: string
+  html: string
+}
+
+export async function sendAdminEmail(args: SendAdminEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.warn('sendAdminEmail: RESEND_API_KEY not set, skipping')
+    return { success: false, skipped: true }
+  }
+
+  const resend = new Resend(apiKey)
+  const from = process.env.EMAIL_FROM || 'NEXU Store <onboarding@resend.dev>'
+
+  try {
+    await resend.emails.send({
+      from,
+      to: args.to,
+      subject: args.subject,
+      html: args.html,
+    })
+    return { success: true }
+  } catch (err) {
+    console.error('sendAdminEmail failed:', err)
+    return { success: false, error: err }
+  }
+}

@@ -20,7 +20,8 @@ import {
   FileText,
   Sliders,
   Star,
-  ClipboardList
+  ClipboardList,
+  Search
 } from 'lucide-react'
 import { useState } from 'react'
 import { signOut } from 'next-auth/react'
@@ -41,6 +42,7 @@ const menuItems = [
   { name: 'Márkák', href: '/admin/brands', icon: Star },
   { name: 'Specifikációk', href: '/admin/specifications', icon: FileText },
   { name: 'Jellemzők', href: '/admin/attributes', icon: Sliders },
+  { name: 'SEO Audit', href: '/admin/seo', icon: Search },
   { name: 'Beállítások', href: '/admin/settings', icon: Settings },
 ]
 

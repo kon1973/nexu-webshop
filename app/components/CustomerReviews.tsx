@@ -142,7 +142,7 @@ export default function CustomerReviews({ reviews }: { reviews: Review[] }) {
                 </p>
 
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-purple-500/20">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-purple-500/20">
                     {review.user?.image ? (
                       <img src={review.user.image} alt={review.userName} className="w-full h-full rounded-full object-cover" />
                     ) : (
@@ -200,7 +200,7 @@ export default function CustomerReviews({ reviews }: { reviews: Review[] }) {
                     </p>
 
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center text-white font-bold">
                         {(review.userName || 'V').charAt(0)}
                       </div>
                       <div>

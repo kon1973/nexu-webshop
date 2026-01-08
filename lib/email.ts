@@ -168,7 +168,7 @@ function renderItemsTable(items: OrderEmailItem[]) {
       const total = formatHuf(item.unitPrice * item.quantity)
       
       const imageHtml = item.image 
-        ? `<img src="${item.image}" alt="" width="48" height="48" style="border-radius:8px; object-fit:cover; background:#222; display:block;" />`
+        ? `<img src="${item.image}" alt="${name}" width="48" height="48" style="border-radius:8px; object-fit:cover; background:#222; display:block;" />`
         : `<div style="width:48px; height:48px; border-radius:8px; background:#222; display:flex; align-items:center; justify-content:center; color:#555; font-size:10px;">N/A</div>`
 
       return `<tr>
