@@ -4,6 +4,7 @@ import { useRecentlyViewed } from '@/context/RecentlyViewedContext'
 import { useEffect, useState } from 'react'
 import ProductCard from './ProductCard'
 import type { Product } from '@prisma/client'
+import { getProductsByIds } from '@/lib/actions/user-actions'
 
 export default function RecentlyViewed() {
   const { viewedIds } = useRecentlyViewed()
@@ -16,22 +17,11 @@ export default function RecentlyViewed() {
       return
     }
 
-    // Fetch products based on IDs
-    // Since we don't have a bulk fetch API for IDs easily accessible from client without server action or new API,
-    // we can create a simple server action or API.
-    // For now, let's assume we fetch them via a new API endpoint /api/products/batch
-    
-    fetch('/api/products/batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: viewedIds }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          // Sort by order in viewedIds
-          const sorted = data.sort((a, b) => viewedIds.indexOf(a.id) - viewedIds.indexOf(b.id))
-          setProducts(sorted)
+    // Fetch products based on IDs using server action
+    getProductsByIds(viewedIds)
+      .then((result) => {
+        if (result.success && Array.isArray(result.products)) {
+          setProducts(result.products as Product[])
         }
       })
       .catch(console.error)

@@ -5,6 +5,7 @@ import ProductCard from './ProductCard'
 import type { Product } from '@prisma/client'
 import { useCart } from '@/context/CartContext'
 import { Sparkles, TrendingUp, Loader2 } from 'lucide-react'
+import { getRecommendations } from '@/lib/actions/user-actions'
 
 interface SmartRecommendationsProps {
   currentProductId?: number
@@ -32,28 +33,16 @@ export default function SmartRecommendations({
       setIsLoading(true)
       
       try {
-        // Get recently viewed from localStorage
-        const recentlyViewedStr = localStorage.getItem('nexu-recently-viewed')
-        const recentlyViewed: string[] = recentlyViewedStr ? JSON.parse(recentlyViewedStr) : []
+        const result = await getRecommendations({
+          productId: currentProductId,
+          category: currentCategory,
+          limit: maxItems
+        })
         
-        // Get cart categories for context
-        const cartCategories = cart.map(item => item.category).filter(Boolean)
-        
-        // Build query params
-        const params = new URLSearchParams()
-        if (currentProductId) params.set('excludeId', currentProductId.toString())
-        if (currentCategory) params.set('category', currentCategory)
-        if (recentlyViewed.length > 0) params.set('recentlyViewed', recentlyViewed.slice(0, 5).join(','))
-        if (cartCategories.length > 0) params.set('cartCategories', [...new Set(cartCategories)].join(','))
-        params.set('limit', maxItems.toString())
-
-        const response = await fetch(`/api/recommendations?${params}`)
-        
-        if (!response.ok) throw new Error('Failed to fetch')
-        
-        const data = await response.json()
-        setRecommendations(data.products || [])
-        setRecommendationType(data.type || 'trending')
+        if (result.success && result.products) {
+          setRecommendations(result.products as ProductWithExtras[])
+          setRecommendationType(currentProductId ? 'personalized' : 'trending')
+        }
       } catch (error) {
         console.error('Error fetching recommendations:', error)
         setRecommendations([])

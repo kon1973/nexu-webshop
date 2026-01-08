@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Facebook, Instagram, Twitter, Mail, MapPin, Phone } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { subscribeToNewsletter } from '@/lib/actions/user-actions'
 
 type FooterProps = {
   settings?: Record<string, string>
@@ -28,21 +29,18 @@ export default function Footer({ settings }: FooterProps) {
     e.preventDefault()
     if (!email) return
     
+    // Honeypot check
+    if (honey) return
+    
     setIsLoading(true)
     try {
-      const res = await fetch('/api/newsletter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, website: honey }), // Send honeypot
-      })
+      const result = await subscribeToNewsletter(email)
 
-      const data = await res.json()
-
-      if (res.ok) {
-        toast.success(data.message || 'Sikeres feliratkozás a hírlevélre!')
+      if (result.success) {
+        toast.success(result.message || 'Sikeres feliratkozás a hírlevélre!')
         setEmail('')
       } else {
-        toast.error(data.error || 'Hiba történt')
+        toast.error(result.error || 'Hiba történt')
       }
     } catch (error) {
       toast.error('Hálózati hiba')

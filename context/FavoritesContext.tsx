@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import type { Product } from '@prisma/client'
+import { getFavorites, addToFavorites, removeFromFavorites, syncFavorites } from '@/lib/actions/user-actions'
 
 export type FavoriteProduct = Product & {
   variants?: { id: string }[]
@@ -24,7 +25,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
 
   useEffect(() => {
-    const syncFavorites = async () => {
+    const loadFavorites = async () => {
       if (status === 'authenticated') {
         // 1. Check for local favorites to sync
         const saved = localStorage.getItem(STORAGE_KEY)
@@ -34,12 +35,8 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
             if (Array.isArray(localFavorites) && localFavorites.length > 0) {
               const productIds = localFavorites.map(p => p.id)
               
-              // Send to server
-              await fetch('/api/user/favorites', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productIds }),
-              })
+              // Sync with server
+              await syncFavorites(productIds)
               
               // Clear local storage after sync
               localStorage.removeItem(STORAGE_KEY)
@@ -50,12 +47,10 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         }
 
         // 2. Fetch merged favorites from server
-        fetch('/api/user/favorites')
-          .then(res => res.json())
-          .then(data => {
-            if (Array.isArray(data)) setFavorites(data)
-          })
-          .catch(console.error)
+        const result = await getFavorites()
+        if (result.success && Array.isArray(result.favorites)) {
+          setFavorites(result.favorites as FavoriteProduct[])
+        }
       } else if (status === 'unauthenticated') {
         const saved = localStorage.getItem(STORAGE_KEY)
         if (!saved) return
@@ -70,7 +65,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    syncFavorites()
+    loadFavorites()
   }, [status])
 
   useEffect(() => {
@@ -96,13 +91,9 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     if (status === 'authenticated') {
       try {
         if (isFav) {
-          await fetch(`/api/user/favorites/${product.id}`, { method: 'DELETE' })
+          await removeFromFavorites(product.id)
         } else {
-          await fetch('/api/user/favorites', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productId: product.id }),
-          })
+          await addToFavorites(product.id)
         }
       } catch (error) {
         console.error('Failed to sync favorite', error)

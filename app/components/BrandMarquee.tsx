@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getBrands } from '@/lib/actions/user-actions'
 
 interface Brand {
   id: string
@@ -14,19 +15,16 @@ export default function BrandMarquee() {
   useEffect(() => {
     const fetchBrands = async () => {
       try {
-        const res = await fetch('/api/brands')
-        if (res.ok) {
-          const data: Brand[] = await res.json()
-          if (data.length > 0) {
-            setBrands(data.map(b => b.name))
-          } else {
-            // Fallback defaults if DB is empty
-            setBrands([
-              "Apple", "Samsung", "Sony", "Dell", "Asus", 
-              "Lenovo", "HP", "LG", "Microsoft", "Razer",
-              "Logitech", "Corsair", "MSI", "Acer"
-            ])
-          }
+        const result = await getBrands()
+        if (result.success && result.brands.length > 0) {
+          setBrands(result.brands.map(b => b.name))
+        } else {
+          // Fallback defaults if DB is empty
+          setBrands([
+            "Apple", "Samsung", "Sony", "Dell", "Asus", 
+            "Lenovo", "HP", "LG", "Microsoft", "Razer",
+            "Logitech", "Corsair", "MSI", "Acer"
+          ])
         }
       } catch (error) {
         console.error('Failed to fetch brands', error)

@@ -5,6 +5,7 @@ import { Star, Send, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { submitReview } from '@/lib/actions/user-actions'
 
 export default function ReviewForm({ productId }: { productId: number }) {
   const { data: session } = useSession()
@@ -28,20 +29,20 @@ export default function ReviewForm({ productId }: { productId: number }) {
     setIsSubmitting(true)
 
     try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, userName, rating, text }),
+      const result = await submitReview({
+        productId,
+        rating,
+        comment: text
       })
 
-      if (res.ok) {
+      if (result.success) {
         toast.success('Köszönjük a véleményed!')
         setText('')
         setRating(0)
         setUserName('')
         router.refresh()
       } else {
-        toast.error('Hiba történt a beküldéskor.')
+        toast.error(result.error || 'Hiba történt a beküldéskor.')
       }
     } catch (error) {
       console.error(error)

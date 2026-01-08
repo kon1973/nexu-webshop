@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { cancelOrder } from '@/lib/actions/user-actions'
 
 export default function CancelOrderButton({ orderId }: { orderId: string }) {
   const [isLoading, setIsLoading] = useState(false)
@@ -13,13 +14,10 @@ export default function CancelOrderButton({ orderId }: { orderId: string }) {
 
     setIsLoading(true)
     try {
-      const res = await fetch(`/api/orders/${orderId}/cancel`, {
-        method: 'POST'
-      })
+      const result = await cancelOrder(orderId)
 
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Hiba történt')
+      if (!result.success) {
+        throw new Error(result.error || 'Hiba történt')
       }
 
       toast.success('Rendelés lemondva')

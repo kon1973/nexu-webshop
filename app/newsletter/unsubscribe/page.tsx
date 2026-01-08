@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Mail, ArrowRight, Loader2, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
+import { unsubscribeFromNewsletter } from '@/lib/actions/user-actions'
 
 export default function UnsubscribePage() {
   const [email, setEmail] = useState('')
@@ -13,14 +14,12 @@ export default function UnsubscribePage() {
     setStatus('loading')
 
     try {
-      const res = await fetch(`/api/newsletter/unsubscribe?email=${encodeURIComponent(email)}`)
+      const result = await unsubscribeFromNewsletter(email)
       
-      if (res.redirected) {
+      if (result.success) {
         setStatus('success')
-      } else if (!res.ok) {
-        throw new Error('Hiba történt')
       } else {
-        setStatus('success')
+        throw new Error(result.error || 'Hiba történt')
       }
     } catch (error) {
       setStatus('error')
