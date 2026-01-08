@@ -199,6 +199,225 @@ async function getTrendingProducts() {
   }))
 }
 
+// Get personalized recommendations based on user history
+async function getPersonalizedRecommendations(userEmail?: string, recentlyViewed?: number[]) {
+  let recommendations: any[] = []
+  
+  // If user is logged in, get recommendations based on order history
+  if (userEmail) {
+    const userOrders = await prisma.order.findMany({
+      where: { customerEmail: userEmail },
+      include: { items: { include: { product: true } } },
+      take: 5,
+      orderBy: { createdAt: 'desc' }
+    })
+    
+    const purchasedCategories = new Set<string>()
+    userOrders.forEach(order => {
+      order.items.forEach((item: any) => {
+        if (item.product?.category) {
+          purchasedCategories.add(item.product.category)
+        }
+      })
+    })
+    
+    if (purchasedCategories.size > 0) {
+      recommendations = await prisma.product.findMany({
+        where: {
+          category: { in: Array.from(purchasedCategories) },
+          isArchived: false,
+          stock: { gt: 0 }
+        },
+        orderBy: { rating: 'desc' },
+        take: 6
+      })
+    }
+  }
+  
+  // If recently viewed products exist, find similar
+  if (recentlyViewed && recentlyViewed.length > 0 && recommendations.length < 4) {
+    const viewedProducts = await prisma.product.findMany({
+      where: { id: { in: recentlyViewed } },
+      select: { category: true, price: true }
+    })
+    
+    const categories = viewedProducts.map(p => p.category)
+    const avgPrice = viewedProducts.reduce((sum, p) => sum + p.price, 0) / viewedProducts.length
+    
+    const similar = await prisma.product.findMany({
+      where: {
+        category: { in: categories },
+        id: { notIn: recentlyViewed },
+        price: { gte: avgPrice * 0.5, lte: avgPrice * 1.5 },
+        isArchived: false,
+        stock: { gt: 0 }
+      },
+      orderBy: { rating: 'desc' },
+      take: 6 - recommendations.length
+    })
+    
+    recommendations = [...recommendations, ...similar]
+  }
+  
+  // Fallback to trending products
+  if (recommendations.length === 0) {
+    recommendations = await prisma.product.findMany({
+      where: { isArchived: false, stock: { gt: 0 } },
+      orderBy: { rating: 'desc' },
+      take: 6
+    })
+  }
+  
+  return recommendations.map(p => ({
+    id: p.id,
+    name: p.name,
+    price: p.salePrice || p.price,
+    category: p.category,
+    rating: p.rating,
+    url: `/shop/${p.id}`,
+    reason: userEmail ? 'Korábbi vásárlásaid alapján' : 'Népszerű termék'
+  }))
+}
+
+// Check available coupons
+async function getAvailableCoupons(userEmail?: string) {
+  const now = new Date()
+  
+  const coupons = await prisma.coupon.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { expiresAt: null },
+        { expiresAt: { gte: now } }
+      ]
+    },
+    take: 5
+  })
+  
+  // Filter out exhausted coupons
+  const availableCoupons = coupons.filter(c => !c.usageLimit || c.usedCount < c.usageLimit)
+  
+  return availableCoupons.map(c => ({
+    code: c.code,
+    discount: c.discountType === 'PERCENTAGE' ? `${c.discountValue}%` : `${c.discountValue} Ft`,
+    type: c.discountType,
+    minOrder: c.minOrderValue || 0,
+    expiresAt: c.expiresAt
+  }))
+}
+
+// Calculate shipping estimate
+async function getShippingEstimate(zipCode?: string, cartTotal?: number) {
+  const shippingOptions = [
+    {
+      name: 'GLS Futár',
+      price: cartTotal && cartTotal >= 20000 ? 0 : 1990,
+      deliveryDays: '1-3 munkanap',
+      freeFrom: 20000
+    },
+    {
+      name: 'GLS Csomagpont',
+      price: cartTotal && cartTotal >= 15000 ? 0 : 1490,
+      deliveryDays: '2-4 munkanap',
+      freeFrom: 15000
+    },
+    {
+      name: 'Express szállítás',
+      price: 2990,
+      deliveryDays: 'Másnapi kézbesítés',
+      freeFrom: null
+    }
+  ]
+  
+  // Estimate delivery date
+  const today = new Date()
+  const estimatedDelivery = new Date(today)
+  estimatedDelivery.setDate(today.getDate() + 2)
+  
+  // Skip weekend
+  if (estimatedDelivery.getDay() === 0) estimatedDelivery.setDate(estimatedDelivery.getDate() + 1)
+  if (estimatedDelivery.getDay() === 6) estimatedDelivery.setDate(estimatedDelivery.getDate() + 2)
+  
+  return {
+    options: shippingOptions,
+    estimatedDelivery: estimatedDelivery.toLocaleDateString('hu-HU', { month: 'long', day: 'numeric' }),
+    note: cartTotal && cartTotal >= 20000 ? '✨ Ingyenes szállításra jogosult!' : `Még ${(20000 - (cartTotal || 0)).toLocaleString('hu-HU')} Ft a ingyenes szállításhoz!`
+  }
+}
+
+// Check product availability and alternatives
+async function checkAvailability(productId: number) {
+  const product = await prisma.product.findUnique({
+    where: { id: productId }
+  })
+  
+  if (!product) return { found: false }
+  
+  const result: any = {
+    found: true,
+    name: product.name,
+    inStock: product.stock > 0,
+    stock: product.stock,
+    restockEstimate: product.stock === 0 ? '1-2 hét' : null
+  }
+  
+  // If out of stock, find alternatives
+  if (product.stock === 0) {
+    const alternatives = await prisma.product.findMany({
+      where: {
+        category: product.category,
+        stock: { gt: 0 },
+        id: { not: productId },
+        price: { gte: product.price * 0.7, lte: product.price * 1.3 }
+      },
+      orderBy: { rating: 'desc' },
+      take: 3
+    })
+    
+    result.alternatives = alternatives.map(p => ({
+      id: p.id,
+      name: p.name,
+      price: p.salePrice || p.price,
+      url: `/shop/${p.id}`
+    }))
+  }
+  
+  return result
+}
+
+// Get deals and promotions
+async function getCurrentDeals() {
+  const now = new Date()
+  
+  // Products on sale
+  const saleProducts = await prisma.product.findMany({
+    where: {
+      isArchived: false,
+      stock: { gt: 0 },
+      salePrice: { not: null },
+      OR: [
+        { saleEndDate: null },
+        { saleEndDate: { gte: now } }
+      ]
+    },
+    orderBy: { salePercentage: 'desc' },
+    take: 6
+  })
+  
+  return {
+    onSale: saleProducts.map(p => ({
+      id: p.id,
+      name: p.name,
+      originalPrice: p.price,
+      salePrice: p.salePrice,
+      discount: p.salePercentage ? `${p.salePercentage}%` : null,
+      url: `/shop/${p.id}`
+    })),
+    freeShippingThreshold: 20000,
+    tip: 'Iratkozz fel hírlevelünkre és kapj 10% kedvezményt!'
+  }
+}
+
 // ============== MAIN CHAT PROCESSING ==============
 
 async function getStoreContext() {
@@ -310,6 +529,69 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         required: ['productId']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getPersonalizedRecommendations',
+      description: 'Személyre szabott termékajánlások. Használd ha a felhasználó ajánlást kér, vagy tanácstalan mit vegyen.',
+      parameters: {
+        type: 'object',
+        properties: {
+          userEmail: { type: 'string', description: 'Felhasználó email címe ha be van jelentkezve' },
+          recentlyViewed: { type: 'array', items: { type: 'number' }, description: 'Nemrég megtekintett termék ID-k' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getAvailableCoupons',
+      description: 'Elérhető kuponok és kedvezmények lekérdezése',
+      parameters: {
+        type: 'object',
+        properties: {
+          userEmail: { type: 'string', description: 'Felhasználó email címe' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getShippingEstimate',
+      description: 'Szállítási költség és idő becslése',
+      parameters: {
+        type: 'object',
+        properties: {
+          zipCode: { type: 'string', description: 'Irányítószám' },
+          cartTotal: { type: 'number', description: 'Kosár összértéke forintban' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'checkAvailability',
+      description: 'Termék elérhetőség és készlet ellenőrzése, alternatívák keresése ha kifogyott',
+      parameters: {
+        type: 'object',
+        properties: {
+          productId: { type: 'number', description: 'Termék azonosítója' }
+        },
+        required: ['productId']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getCurrentDeals',
+      description: 'Aktuális akciók, leárazások és promóciók lekérése',
+      parameters: { type: 'object', properties: {} }
+    }
   }
 ]
 
@@ -327,6 +609,16 @@ async function executeFunction(name: string, args: any): Promise<any> {
       return getFAQAnswer(args.topic)
     case 'getTrendingProducts':
       return await getTrendingProducts()
+    case 'getPersonalizedRecommendations':
+      return await getPersonalizedRecommendations(args.userEmail, args.recentlyViewed)
+    case 'getAvailableCoupons':
+      return await getAvailableCoupons(args.userEmail)
+    case 'getShippingEstimate':
+      return await getShippingEstimate(args.zipCode, args.cartTotal)
+    case 'checkAvailability':
+      return await checkAvailability(args.productId)
+    case 'getCurrentDeals':
+      return await getCurrentDeals()
     case 'addToCart':
       const product = await prisma.product.findUnique({ where: { id: args.productId } })
       if (!product) return { success: false, message: 'Termék nem található' }

@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react'
+import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw, Brain, Wand2, BarChart3 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import AIInsightsPanel from '../components/AIInsightsPanel'
+import AIMarketingAssistant from '../components/AIMarketingAssistant'
+import AIProductAnalyzer from '../components/AIProductAnalyzer'
 
 interface ChatStats {
   totalConversations: number
@@ -26,6 +29,7 @@ export default function AIDashboard() {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d')
+  const [activeTab, setActiveTab] = useState<'stats' | 'insights' | 'marketing' | 'analyzer'>('stats')
 
   useEffect(() => {
     fetchStats()
@@ -157,20 +161,76 @@ export default function AIDashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {statCards.map((stat, index) => (
-          <motion.div
-            key={stat.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-[#121212] border border-white/10 rounded-xl p-4 hover:border-purple-500/30 transition-colors"
-          >
-            <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${colorClasses[stat.color]} flex items-center justify-center mb-3`}>
-              <stat.icon size={20} className="text-white" />
-            </div>
-            <p className="text-gray-400 text-xs mb-1">{stat.title}</p>
+      {/* Tab Navigation */}
+      <div className="flex gap-2 p-1 bg-white/5 rounded-xl w-fit">
+        <button
+          onClick={() => setActiveTab('stats')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'stats'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <MessageSquare size={16} />
+          Chatbot Statisztikák
+        </button>
+        <button
+          onClick={() => setActiveTab('insights')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'insights'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Brain size={16} />
+          AI Üzleti Elemzések
+        </button>
+        <button
+          onClick={() => setActiveTab('marketing')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'marketing'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Wand2 size={16} />
+          Marketing Asszisztens
+        </button>
+        <button
+          onClick={() => setActiveTab('analyzer')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'analyzer'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <BarChart3 size={16} />
+          Termék Elemző
+        </button>
+      </div>
+
+      {activeTab === 'insights' ? (
+        <AIInsightsPanel />
+      ) : activeTab === 'marketing' ? (
+        <AIMarketingAssistant />
+      ) : activeTab === 'analyzer' ? (
+        <AIProductAnalyzer />
+      ) : (
+        <>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {statCards.map((stat, index) => (
+              <motion.div
+                key={stat.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="bg-[#121212] border border-white/10 rounded-xl p-4 hover:border-purple-500/30 transition-colors"
+              >
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${colorClasses[stat.color]} flex items-center justify-center mb-3`}>
+                  <stat.icon size={20} className="text-white" />
+                </div>
+                <p className="text-gray-400 text-xs mb-1">{stat.title}</p>
             <p className="text-2xl font-bold text-white">{stat.value}</p>
             <div className={`flex items-center gap-1 mt-1 text-xs ${stat.positive ? 'text-green-400' : 'text-red-400'}`}>
               {stat.positive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
@@ -274,7 +334,7 @@ export default function AIDashboard() {
               </div>
               <div>
                 <p className="text-gray-400 text-xs">Aktív Tools</p>
-                <p className="text-white font-semibold">7 db</p>
+                <p className="text-white font-semibold">12 db</p>
               </div>
             </div>
           </div>
@@ -288,7 +348,7 @@ export default function AIDashboard() {
         <div className="mt-4 pt-4 border-t border-white/10">
           <p className="text-gray-400 text-xs mb-2">Elérhető funkciók:</p>
           <div className="flex flex-wrap gap-2">
-            {['Termékkeresés', 'Termék részletek', 'Rendelés követés', 'Összehasonlítás', 'FAQ válaszok', 'Népszerű termékek', 'Kosárba helyezés', 'Leírás generálás', 'SEO optimalizálás', 'Képkeresés'].map((tool) => (
+            {['Termékkeresés', 'Termék részletek', 'Rendelés követés', 'Összehasonlítás', 'FAQ válaszok', 'Népszerű termékek', 'Kosárba helyezés', 'Ajánlások', 'Kuponok', 'Szállítás', 'Készlet', 'Akciók'].map((tool) => (
               <span key={tool} className="px-2 py-1 bg-white/5 rounded text-xs text-gray-300">
                 {tool}
               </span>
@@ -296,6 +356,8 @@ export default function AIDashboard() {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   )
 }
