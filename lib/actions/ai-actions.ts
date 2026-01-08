@@ -824,3 +824,755 @@ export async function getAIStats(range: '7d' | '30d' | '90d' = '7d') {
     return { error: 'Failed to fetch AI stats' }
   }
 }
+
+// ============== ADVANCED AI ADMIN FEATURES ==============
+
+/**
+ * Értékesítési előrejelzés AI-val
+ */
+export async function generateSalesForecast(params?: { days?: number }) {
+  await requireAdmin()
+
+  try {
+    const forecastDays = params?.days || 30
+    const historicalDays = 90
+
+    // Get historical sales data
+    const startDate = subDays(new Date(), historicalDays)
+    const orders = await prisma.order.findMany({
+      where: { createdAt: { gte: startDate } },
+      include: {
+        items: {
+          include: { product: { select: { category: true } } }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+
+    // Aggregate by day
+    const dailySales: Record<string, { revenue: number; orders: number; categories: Record<string, number> }> = {}
+    
+    for (const order of orders) {
+      const date = format(order.createdAt, 'yyyy-MM-dd')
+      if (!dailySales[date]) {
+        dailySales[date] = { revenue: 0, orders: 0, categories: {} }
+      }
+      dailySales[date].revenue += order.totalPrice
+      dailySales[date].orders++
+      
+      for (const item of order.items) {
+        const cat = item.product?.category || 'Egyéb'
+        dailySales[date].categories[cat] = (dailySales[date].categories[cat] || 0) + item.price * item.quantity
+      }
+    }
+
+    const salesArray = Object.entries(dailySales).map(([date, data]) => ({
+      date,
+      ...data
+    }))
+
+    // Identify trends and seasonality
+    const weekdayAverages: Record<number, { revenue: number; count: number }> = {}
+    for (const sale of salesArray) {
+      const dayOfWeek = new Date(sale.date).getDay()
+      if (!weekdayAverages[dayOfWeek]) {
+        weekdayAverages[dayOfWeek] = { revenue: 0, count: 0 }
+      }
+      weekdayAverages[dayOfWeek].revenue += sale.revenue
+      weekdayAverages[dayOfWeek].count++
+    }
+
+    // Calculate average daily revenue
+    const avgDailyRevenue = salesArray.length > 0 
+      ? salesArray.reduce((sum, s) => sum + s.revenue, 0) / salesArray.length 
+      : 0
+
+    // Calculate trend (last 30 days vs previous 30 days)
+    const recentSales = salesArray.slice(-30)
+    const previousSales = salesArray.slice(-60, -30)
+    const recentAvg = recentSales.length > 0 
+      ? recentSales.reduce((sum, s) => sum + s.revenue, 0) / recentSales.length 
+      : 0
+    const previousAvg = previousSales.length > 0 
+      ? previousSales.reduce((sum, s) => sum + s.revenue, 0) / previousSales.length 
+      : recentAvg
+
+    const trendMultiplier = previousAvg > 0 ? recentAvg / previousAvg : 1
+
+    // Generate AI forecast
+    const aiResponse = await openai.chat.completions.create({
+      model: 'gpt-5.2',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy e-commerce előrejelzési AI vagy. Az eladási adatok alapján készíts előrejelzést és javaslatokat.
+          
+Válaszolj JSON formátumban:
+{
+  "forecast": {
+    "nextMonth": { "low": szám, "expected": szám, "high": szám },
+    "trend": "growing" | "stable" | "declining",
+    "confidence": 0.0-1.0
+  },
+  "insights": ["insight1", "insight2", "insight3"],
+  "recommendations": ["recommendation1", "recommendation2"],
+  "risks": ["risk1", "risk2"],
+  "opportunities": ["opportunity1", "opportunity2"]
+}`
+        },
+        {
+          role: 'user',
+          content: `Elemezd az elmúlt ${historicalDays} nap eladásait és készíts ${forecastDays} napos előrejelzést:
+
+Átlagos napi bevétel: ${Math.round(avgDailyRevenue).toLocaleString()} Ft
+Trend szorzó: ${trendMultiplier.toFixed(2)}x
+Elmúlt 30 nap átlag: ${Math.round(recentAvg).toLocaleString()} Ft/nap
+Előző 30 nap átlag: ${Math.round(previousAvg).toLocaleString()} Ft/nap
+Összes rendelés: ${orders.length}
+Napok száma: ${salesArray.length}
+
+Heti bontás (napi átlag):
+${Object.entries(weekdayAverages).map(([day, data]) => {
+  const dayNames = ['Vasárnap', 'Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek', 'Szombat']
+  return `${dayNames[parseInt(day)]}: ${Math.round(data.revenue / data.count).toLocaleString()} Ft`
+}).join('\n')}`
+        }
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 1000,
+      temperature: 0.6
+    })
+
+    let aiForecast = {}
+    try {
+      aiForecast = JSON.parse(aiResponse.choices[0]?.message?.content || '{}')
+    } catch {
+      aiForecast = { forecast: { expected: avgDailyRevenue * forecastDays } }
+    }
+
+    // Generate daily forecast
+    const dailyForecast = []
+    for (let i = 1; i <= forecastDays; i++) {
+      const date = format(subDays(new Date(), -i), 'yyyy-MM-dd')
+      const dayOfWeek = new Date(date).getDay()
+      const weekdayData = weekdayAverages[dayOfWeek]
+      const weekdayMultiplier = weekdayData && avgDailyRevenue > 0
+        ? (weekdayData.revenue / weekdayData.count) / avgDailyRevenue
+        : 1
+      
+      const baseRevenue = recentAvg * trendMultiplier * weekdayMultiplier
+      dailyForecast.push({
+        date,
+        predicted: Math.round(baseRevenue),
+        low: Math.round(baseRevenue * 0.8),
+        high: Math.round(baseRevenue * 1.2)
+      })
+    }
+
+    return {
+      success: true,
+      historicalData: salesArray.slice(-30),
+      dailyForecast,
+      summary: {
+        avgDailyRevenue: Math.round(avgDailyRevenue),
+        expectedMonthlyRevenue: Math.round(avgDailyRevenue * 30 * trendMultiplier),
+        trend: trendMultiplier > 1.05 ? 'growing' : trendMultiplier < 0.95 ? 'declining' : 'stable',
+        trendPercentage: Math.round((trendMultiplier - 1) * 100)
+      },
+      aiForecast,
+      generatedAt: new Date().toISOString()
+    }
+  } catch (error) {
+    console.error('Sales forecast error:', error)
+    return { error: 'Failed to generate forecast' }
+  }
+}
+
+/**
+ * Ügyfélszegmentáció AI-val
+ */
+export async function analyzeCustomerSegments() {
+  await requireAdmin()
+
+  try {
+    // Get customer data with orders
+    const customers = await prisma.user.findMany({
+      where: { role: 'user' },
+      include: {
+        orders: {
+          include: { 
+            items: {
+              include: {
+                product: { select: { category: true } }
+              }
+            }
+          }
+        }
+      }
+    })
+
+    // Calculate metrics for each customer
+    const customerMetrics = customers.map(customer => {
+      const totalOrders = customer.orders.length
+      const totalSpent = customer.orders.reduce((sum, o) => sum + o.totalPrice, 0)
+      const avgOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
+      
+      const orderDates = customer.orders.map(o => o.createdAt).sort((a, b) => b.getTime() - a.getTime())
+      const lastOrderDate = orderDates[0]
+      const daysSinceLastOrder = lastOrderDate 
+        ? Math.floor((Date.now() - lastOrderDate.getTime()) / (1000 * 60 * 60 * 24))
+        : 999
+      
+      // Categories purchased
+      const categories = [...new Set(
+        customer.orders.flatMap(o => o.items.map(i => i.product?.category).filter(Boolean))
+      )] as string[]
+
+      return {
+        id: customer.id,
+        email: customer.email,
+        name: customer.name,
+        totalOrders,
+        totalSpent,
+        avgOrderValue: Math.round(avgOrderValue),
+        daysSinceLastOrder,
+        categories,
+        createdAt: customer.createdAt
+      }
+    }).filter(c => c.totalOrders > 0)
+
+    // Segment customers
+    const segments = {
+      vip: customerMetrics.filter(c => c.totalSpent >= 500000 || c.totalOrders >= 10),
+      loyal: customerMetrics.filter(c => c.totalOrders >= 3 && c.totalOrders < 10 && c.daysSinceLastOrder <= 90),
+      promising: customerMetrics.filter(c => c.totalOrders >= 2 && c.totalOrders < 3 && c.avgOrderValue >= 50000),
+      newCustomers: customerMetrics.filter(c => c.totalOrders === 1 && c.daysSinceLastOrder <= 30),
+      atRisk: customerMetrics.filter(c => c.totalOrders >= 2 && c.daysSinceLastOrder > 60 && c.daysSinceLastOrder <= 180),
+      lost: customerMetrics.filter(c => c.daysSinceLastOrder > 180)
+    }
+
+    // Calculate segment statistics
+    const segmentStats = Object.entries(segments).map(([name, customers]) => ({
+      name,
+      count: customers.length,
+      totalRevenue: customers.reduce((sum, c) => sum + c.totalSpent, 0),
+      avgOrderValue: customers.length > 0 
+        ? Math.round(customers.reduce((sum, c) => sum + c.avgOrderValue, 0) / customers.length)
+        : 0,
+      avgOrders: customers.length > 0
+        ? Math.round(customers.reduce((sum, c) => sum + c.totalOrders, 0) / customers.length * 10) / 10
+        : 0
+    }))
+
+    // Get AI recommendations for each segment
+    const aiResponse = await openai.chat.completions.create({
+      model: 'gpt-5.2',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy CRM szakértő AI vagy. Az ügyfélszegmensek alapján adj marketing és retention javaslatokat magyarul.
+
+Válaszolj JSON formátumban:
+{
+  "segmentStrategies": {
+    "vip": { "strategy": "stratégia", "actions": ["akció1", "akció2"] },
+    "loyal": { "strategy": "stratégia", "actions": ["akció1", "akció2"] },
+    "promising": { "strategy": "stratégia", "actions": ["akció1", "akció2"] },
+    "newCustomers": { "strategy": "stratégia", "actions": ["akció1", "akció2"] },
+    "atRisk": { "strategy": "stratégia", "actions": ["akció1", "akció2"] },
+    "lost": { "strategy": "stratégia", "actions": ["akció1", "akció2"] }
+  },
+  "overallInsights": ["insight1", "insight2"],
+  "priorityActions": ["akció1", "akció2", "akció3"]
+}`
+        },
+        {
+          role: 'user',
+          content: `Ügyfélszegmensek adatai:\n${JSON.stringify(segmentStats, null, 2)}\n\nÖsszes aktív ügyfél: ${customerMetrics.length}`
+        }
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 1200,
+      temperature: 0.7
+    })
+
+    let aiStrategies = {}
+    try {
+      aiStrategies = JSON.parse(aiResponse.choices[0]?.message?.content || '{}')
+    } catch {
+      aiStrategies = {}
+    }
+
+    return {
+      success: true,
+      totalCustomers: customerMetrics.length,
+      segments: segmentStats,
+      aiStrategies,
+      topCustomers: customerMetrics
+        .sort((a, b) => b.totalSpent - a.totalSpent)
+        .slice(0, 10)
+        .map(c => ({ name: c.name, email: c.email, totalSpent: c.totalSpent, orders: c.totalOrders })),
+      generatedAt: new Date().toISOString()
+    }
+  } catch (error) {
+    console.error('Customer segments error:', error)
+    return { error: 'Failed to analyze segments' }
+  }
+}
+
+/**
+ * Anomália detektálás - szokatlan tevékenységek felismerése
+ */
+export async function detectAnomalies() {
+  await requireAdmin()
+
+  try {
+    const today = new Date()
+    const last7Days = subDays(today, 7)
+    const last30Days = subDays(today, 30)
+
+    const [recentOrders, historicalOrders, recentSessions] = await Promise.all([
+      prisma.order.findMany({
+        where: { createdAt: { gte: last7Days } },
+        include: { items: true, user: { select: { email: true } } }
+      }),
+      prisma.order.findMany({
+        where: { createdAt: { gte: last30Days, lt: last7Days } }
+      }),
+      prisma.chatSession.findMany({
+        where: { startedAt: { gte: last7Days } }
+      })
+    ])
+
+    const anomalies: Array<{
+      type: string
+      severity: 'low' | 'medium' | 'high'
+      title: string
+      description: string
+      data?: any
+    }> = []
+
+    // 1. Unusual order values
+    const avgHistoricalOrderValue = historicalOrders.length > 0
+      ? historicalOrders.reduce((sum, o) => sum + o.totalPrice, 0) / historicalOrders.length
+      : 50000
+
+    for (const order of recentOrders) {
+      if (order.totalPrice > avgHistoricalOrderValue * 5) {
+        anomalies.push({
+          type: 'high_value_order',
+          severity: 'medium',
+          title: 'Szokatlanul magas értékű rendelés',
+          description: `${order.totalPrice.toLocaleString()} Ft értékű rendelés (átlag: ${Math.round(avgHistoricalOrderValue).toLocaleString()} Ft)`,
+          data: { orderId: order.id, email: order.user?.email }
+        })
+      }
+    }
+
+    // 2. Multiple orders from same user in short time
+    const userOrders: Record<string, number> = {}
+    for (const order of recentOrders.filter(o => o.userId)) {
+      userOrders[order.userId!] = (userOrders[order.userId!] || 0) + 1
+    }
+    
+    for (const [userId, count] of Object.entries(userOrders)) {
+      if (count >= 5) {
+        const user = recentOrders.find(o => o.userId === userId)?.user
+        anomalies.push({
+          type: 'frequent_orders',
+          severity: 'low',
+          title: 'Gyakori rendelés ugyanattól a felhasználótól',
+          description: `${count} rendelés 7 nap alatt`,
+          data: { userId, email: user?.email }
+        })
+      }
+    }
+
+    // 3. Sudden traffic spike in chat
+    const avgDailySessions = recentSessions.length / 7
+    const todaySessions = recentSessions.filter(s => 
+      format(s.startedAt, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+    ).length
+
+    if (todaySessions > avgDailySessions * 3 && avgDailySessions > 5) {
+      anomalies.push({
+        type: 'traffic_spike',
+        severity: 'medium',
+        title: 'Hirtelen megnövekedett chatbot forgalom',
+        description: `${todaySessions} session ma (átlag: ${Math.round(avgDailySessions)}/nap)`,
+        data: { today: todaySessions, average: avgDailySessions }
+      })
+    }
+
+    // 4. Revenue anomaly
+    const dailyRevenues: Record<string, number> = {}
+    for (const order of recentOrders) {
+      const date = format(order.createdAt, 'yyyy-MM-dd')
+      dailyRevenues[date] = (dailyRevenues[date] || 0) + order.totalPrice
+    }
+
+    const revenueValues = Object.values(dailyRevenues)
+    const avgDailyRevenue = revenueValues.length > 0
+      ? revenueValues.reduce((a, b) => a + b, 0) / revenueValues.length
+      : 0
+
+    for (const [date, revenue] of Object.entries(dailyRevenues)) {
+      if (revenue < avgDailyRevenue * 0.3 && avgDailyRevenue > 10000) {
+        anomalies.push({
+          type: 'revenue_drop',
+          severity: 'high',
+          title: 'Jelentős bevételcsökkenés',
+          description: `${date}: ${revenue.toLocaleString()} Ft (átlag: ${Math.round(avgDailyRevenue).toLocaleString()} Ft)`,
+          data: { date, revenue, average: avgDailyRevenue }
+        })
+      }
+    }
+
+    // 5. Check for cancelled orders spike
+    const cancelledOrders = recentOrders.filter(o => o.status === 'CANCELLED')
+    const cancelRate = recentOrders.length > 0 ? cancelledOrders.length / recentOrders.length : 0
+    
+    if (cancelRate > 0.2 && cancelledOrders.length > 3) {
+      anomalies.push({
+        type: 'high_cancellation',
+        severity: 'high',
+        title: 'Magas lemondási arány',
+        description: `${Math.round(cancelRate * 100)}% lemondás (${cancelledOrders.length}/${recentOrders.length})`,
+        data: { rate: cancelRate, count: cancelledOrders.length }
+      })
+    }
+
+    // Sort by severity
+    const severityOrder = { high: 0, medium: 1, low: 2 }
+    anomalies.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+
+    return {
+      success: true,
+      anomalies,
+      summary: {
+        totalAnomalies: anomalies.length,
+        highSeverity: anomalies.filter(a => a.severity === 'high').length,
+        mediumSeverity: anomalies.filter(a => a.severity === 'medium').length,
+        lowSeverity: anomalies.filter(a => a.severity === 'low').length
+      },
+      period: {
+        start: format(last7Days, 'yyyy-MM-dd'),
+        end: format(today, 'yyyy-MM-dd')
+      }
+    }
+  } catch (error) {
+    console.error('Anomaly detection error:', error)
+    return { error: 'Failed to detect anomalies' }
+  }
+}
+
+/**
+ * Automatikus SEO javaslatok AI-val
+ */
+export async function generateSEOSuggestions(productId?: number) {
+  await requireAdmin()
+
+  try {
+    let targetProducts
+    
+    if (productId) {
+      const product = await prisma.product.findUnique({ where: { id: productId } })
+      if (!product) return { error: 'Product not found' }
+      targetProducts = [product]
+    } else {
+      // Get products with weak SEO
+      targetProducts = await prisma.product.findMany({
+        where: {
+          isArchived: false,
+          OR: [
+            { metaTitle: null },
+            { metaDescription: null },
+            { description: { equals: '' } }
+          ]
+        },
+        take: 10
+      })
+    }
+
+    const suggestions = []
+
+    for (const product of targetProducts) {
+      const seoResponse = await openai.chat.completions.create({
+        model: 'gpt-5.2',
+        messages: [
+          {
+            role: 'system',
+            content: `Te egy SEO szakértő vagy magyar e-commerce oldalakhoz. Generálj SEO-optimalizált meta adatokat.
+
+Szabályok:
+- Meta title: max 60 karakter, tartalmazza a fő kulcsszót
+- Meta description: max 160 karakter, cselekvésre ösztönző
+- Kulcsszavak: 5-8 releváns kulcsszó
+
+Válaszolj JSON formátumban:
+{
+  "metaTitle": "...",
+  "metaDescription": "...",
+  "keywords": ["kulcsszó1", "kulcsszó2"],
+  "suggestions": ["javaslat1", "javaslat2"]
+}`
+          },
+          {
+            role: 'user',
+            content: `Termék: ${product.name}
+Kategória: ${product.category}
+Jelenlegi leírás: ${product.description?.slice(0, 200)}
+Ár: ${product.price} Ft
+${product.metaTitle ? `Jelenlegi meta title: ${product.metaTitle}` : 'Nincs meta title'}
+${product.metaDescription ? `Jelenlegi meta desc: ${product.metaDescription}` : 'Nincs meta description'}`
+          }
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 500,
+        temperature: 0.7
+      })
+
+      let seoData = {}
+      try {
+        seoData = JSON.parse(seoResponse.choices[0]?.message?.content || '{}')
+      } catch {
+        continue
+      }
+
+      suggestions.push({
+        productId: product.id,
+        productName: product.name,
+        current: {
+          metaTitle: product.metaTitle,
+          metaDescription: product.metaDescription
+        },
+        suggested: seoData
+      })
+    }
+
+    return {
+      success: true,
+      suggestions,
+      generatedAt: new Date().toISOString()
+    }
+  } catch (error) {
+    console.error('SEO suggestions error:', error)
+    return { error: 'Failed to generate SEO suggestions' }
+  }
+}
+
+/**
+ * Automatikus válaszgenerálás ügyfélkérdésekre
+ */
+export async function generateCustomerResponse(params: {
+  question: string
+  orderId?: string
+  context?: string
+}) {
+  await requireAdmin()
+
+  const { question, orderId, context } = params
+
+  try {
+    let orderContext = ''
+    
+    if (orderId) {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: { include: { product: { select: { name: true } } } },
+          user: { select: { name: true, email: true } }
+        }
+      })
+      
+      if (order) {
+        orderContext = `
+Rendelés információk:
+- Azonosító: ${order.id}
+- Állapot: ${order.status}
+- Összeg: ${order.totalPrice.toLocaleString()} Ft
+- Termékek: ${order.items.map(i => i.product?.name).join(', ')}
+- Dátum: ${format(order.createdAt, 'yyyy.MM.dd HH:mm')}
+`
+      }
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-5.2',
+      messages: [
+        {
+          role: 'system',
+          content: `Te a NEXU Webshop ügyfélszolgálati asszisztense vagy. Generálj professzionális, barátságos választ az ügyfél kérdésére magyarul.
+
+Bolt adatok:
+- Név: NEXU Webshop
+- Email: info@nexu.hu
+- Szállítás: 1-3 munkanap (GLS)
+- Visszaküldés: 14 nap
+- Garancia: gyártói garancia minden termékre
+
+${orderContext}
+
+${context ? `További kontextus: ${context}` : ''}
+
+Készíts 2 változatot:
+1. Rövid (1-2 mondat)
+2. Részletes (teljes válasz)
+
+Formázd JSON-ként:
+{
+  "shortResponse": "...",
+  "fullResponse": "...",
+  "suggestedActions": ["akció1", "akció2"],
+  "sentiment": "positive" | "neutral" | "negative",
+  "requiresEscalation": true/false
+}`
+        },
+        {
+          role: 'user',
+          content: `Ügyfél kérdése: ${question}`
+        }
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 800,
+      temperature: 0.7
+    })
+
+    let responseData = {}
+    try {
+      responseData = JSON.parse(response.choices[0]?.message?.content || '{}')
+    } catch {
+      responseData = { fullResponse: 'Sajnáljuk, nem sikerült választ generálni.' }
+    }
+
+    return {
+      success: true,
+      ...responseData
+    }
+  } catch (error) {
+    console.error('Customer response error:', error)
+    return { error: 'Failed to generate response' }
+  }
+}
+
+/**
+ * Készlet-optimalizálási javaslatok
+ */
+export async function analyzeInventoryOptimization() {
+  await requireAdmin()
+
+  try {
+    const thirtyDaysAgo = subDays(new Date(), 30)
+
+    const [products, orderItems] = await Promise.all([
+      prisma.product.findMany({
+        where: { isArchived: false },
+        include: { variants: true }
+      }),
+      prisma.orderItem.findMany({
+        where: { order: { createdAt: { gte: thirtyDaysAgo } } },
+        include: { product: true }
+      })
+    ])
+
+    // Calculate sales velocity
+    const salesByProduct: Record<number, number> = {}
+    for (const item of orderItems) {
+      if (item.productId) {
+        salesByProduct[item.productId] = (salesByProduct[item.productId] || 0) + item.quantity
+      }
+    }
+
+    const inventory = products.map(p => {
+      const totalStock = p.variants.length > 0
+        ? p.variants.reduce((sum, v) => sum + (v.stock || 0), 0)
+        : p.stock || 0
+      const monthlySales = salesByProduct[p.id] || 0
+      const daysOfStock = monthlySales > 0 ? Math.round((totalStock / monthlySales) * 30) : 999
+      
+      return {
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        stock: totalStock,
+        monthlySales,
+        daysOfStock,
+        price: p.price,
+        status: totalStock === 0 ? 'out_of_stock'
+          : daysOfStock <= 7 ? 'critical'
+          : daysOfStock <= 14 ? 'low'
+          : daysOfStock > 180 ? 'overstock'
+          : 'healthy'
+      }
+    })
+
+    const criticalItems = inventory.filter(i => i.status === 'critical')
+    const lowItems = inventory.filter(i => i.status === 'low')
+    const overstockItems = inventory.filter(i => i.status === 'overstock')
+    const outOfStock = inventory.filter(i => i.status === 'out_of_stock')
+
+    // AI recommendations
+    const aiResponse = await openai.chat.completions.create({
+      model: 'gpt-5.2',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy készletgazdálkodási AI szakértő vagy. Elemezd a készlet adatokat és adj konkrét javaslatokat magyarul.
+
+Válaszolj JSON formátumban:
+{
+  "urgentActions": ["sürgős akció 1", "sürgős akció 2"],
+  "restockRecommendations": [
+    { "product": "terméknév", "suggestedQuantity": szám, "reason": "indoklás" }
+  ],
+  "overstockSolutions": [
+    { "product": "terméknév", "suggestion": "javaslat" }
+  ],
+  "generalInsights": ["insight1", "insight2"]
+}`
+        },
+        {
+          role: 'user',
+          content: `Készlet állapot:
+- Kritikus (<=7 nap): ${criticalItems.length} termék
+- Alacsony (<=14 nap): ${lowItems.length} termék
+- Túlkészlet (>180 nap): ${overstockItems.length} termék
+- Elfogyott: ${outOfStock.length} termék
+
+Kritikus termékek: ${criticalItems.slice(0, 5).map(i => `${i.name} (${i.stock} db, ${i.daysOfStock} nap)`).join(', ')}
+
+Túlkészlet termékek: ${overstockItems.slice(0, 5).map(i => `${i.name} (${i.stock} db, ${i.daysOfStock} nap készlet)`).join(', ')}`
+        }
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 800,
+      temperature: 0.6
+    })
+
+    let aiRecommendations = {}
+    try {
+      aiRecommendations = JSON.parse(aiResponse.choices[0]?.message?.content || '{}')
+    } catch {
+      aiRecommendations = {}
+    }
+
+    return {
+      success: true,
+      summary: {
+        totalProducts: inventory.length,
+        healthy: inventory.filter(i => i.status === 'healthy').length,
+        critical: criticalItems.length,
+        low: lowItems.length,
+        overstock: overstockItems.length,
+        outOfStock: outOfStock.length
+      },
+      criticalItems: criticalItems.slice(0, 10),
+      overstockItems: overstockItems.slice(0, 10),
+      aiRecommendations,
+      generatedAt: new Date().toISOString()
+    }
+  } catch (error) {
+    console.error('Inventory optimization error:', error)
+    return { error: 'Failed to analyze inventory' }
+  }
+}
