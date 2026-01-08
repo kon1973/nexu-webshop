@@ -13,6 +13,7 @@ import { PWAProvider } from './components/PWAProvider'
 import { getSiteUrl } from '@/lib/site'
 import { getSettings, getCategories } from '@/lib/cache'
 import OrganizationJsonLd from './components/OrganizationJsonLd'
+import AIChatbot from './components/AIChatbot'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -117,6 +118,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <main id="main-content">{children}</main>
             <Footer settings={settings} />
             <ScrollToTop />
+            <AIChatbot />
             <Toaster 
             position="bottom-right" 
             theme="dark"
