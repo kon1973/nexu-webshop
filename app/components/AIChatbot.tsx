@@ -95,6 +95,7 @@ const thinkingMessages = [
 ]
 
 const STORAGE_KEY = 'nexu-chat-history'
+const SESSION_KEY = 'nexu-chat-session'
 
 // ============== COMPONENTS ==============
 
@@ -248,6 +249,7 @@ export default function AIChatbot() {
   const [isListening, setIsListening] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [savedSessions, setSavedSessions] = useState<{ date: string; messages: Message[] }[]>([])
+  const [chatSessionId, setChatSessionId] = useState<string | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
@@ -261,6 +263,15 @@ export default function AIChatbot() {
         try {
           setSavedSessions(JSON.parse(saved))
         } catch {}
+      }
+      // Load or generate session ID
+      const existingSession = localStorage.getItem(SESSION_KEY)
+      if (existingSession) {
+        setChatSessionId(existingSession)
+      } else {
+        const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        localStorage.setItem(SESSION_KEY, newSessionId)
+        setChatSessionId(newSessionId)
       }
     }
   }, [])
@@ -380,13 +391,20 @@ export default function AIChatbot() {
           messages: [...messages.filter(m => m.id !== 'welcome'), userMessage].map(m => ({
             role: m.role,
             content: m.content
-          }))
+          })),
+          sessionId: chatSessionId
         })
       })
 
       if (!response.ok) throw new Error('Chat request failed')
 
       const data = await response.json()
+
+      // Update session ID if returned
+      if (data.sessionId && data.sessionId !== chatSessionId) {
+        setChatSessionId(data.sessionId)
+        localStorage.setItem(SESSION_KEY, data.sessionId)
+      }
 
       // Handle cart action from AI
       if (data.cartAction?.success) {
@@ -462,6 +480,11 @@ export default function AIChatbot() {
       setSavedSessions(newSessions)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newSessions))
     }
+
+    // Generate new session ID for analytics
+    const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    localStorage.setItem(SESSION_KEY, newSessionId)
+    setChatSessionId(newSessionId)
 
     setMessages([{
       id: 'welcome',

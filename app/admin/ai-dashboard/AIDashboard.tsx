@@ -1,11 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw, Brain, Wand2, BarChart3 } from 'lucide-react'
+import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw, Brain, Wand2, BarChart3, LineChart, AlertTriangle, Layers } from 'lucide-react'
 import { motion } from 'framer-motion'
 import AIInsightsPanel from '../components/AIInsightsPanel'
 import AIMarketingAssistant from '../components/AIMarketingAssistant'
 import AIProductAnalyzer from '../components/AIProductAnalyzer'
+import AIForecastPanel from '../components/AIForecastPanel'
+import AICustomerSegments from '../components/AICustomerSegments'
+import AIAnomalyDetection from '../components/AIAnomalyDetection'
+import AIInventoryOptimization from '../components/AIInventoryOptimization'
+import AISEOPanel from '../components/AISEOPanel'
+import AICustomerResponsePanel from '../components/AICustomerResponsePanel'
 import { getAIStats } from '@/lib/actions/ai-actions'
 
 interface ChatStats {
@@ -30,7 +36,7 @@ export default function AIDashboard() {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d')
-  const [activeTab, setActiveTab] = useState<'stats' | 'insights' | 'marketing' | 'analyzer'>('stats')
+  const [activeTab, setActiveTab] = useState<'stats' | 'insights' | 'marketing' | 'analyzer' | 'forecast' | 'segments' | 'anomaly' | 'inventory' | 'seo' | 'responses'>('stats')
 
   useEffect(() => {
     fetchStats()
@@ -162,7 +168,7 @@ export default function AIDashboard() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 p-1 bg-white/5 rounded-xl w-fit">
+      <div className="flex flex-wrap gap-2 p-1 bg-white/5 rounded-xl">
         <button
           onClick={() => setActiveTab('stats')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
@@ -172,7 +178,7 @@ export default function AIDashboard() {
           }`}
         >
           <MessageSquare size={16} />
-          Chatbot Statisztikák
+          Chatbot
         </button>
         <button
           onClick={() => setActiveTab('insights')}
@@ -183,7 +189,62 @@ export default function AIDashboard() {
           }`}
         >
           <Brain size={16} />
-          AI Üzleti Elemzések
+          Üzleti Elemzések
+        </button>
+        <button
+          onClick={() => setActiveTab('forecast')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'forecast'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <LineChart size={16} />
+          Előrejelzés
+        </button>
+        <button
+          onClick={() => setActiveTab('segments')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'segments'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Users size={16} />
+          Ügyfél Szegmensek
+        </button>
+        <button
+          onClick={() => setActiveTab('anomaly')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'anomaly'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <AlertTriangle size={16} />
+          Anomáliák
+        </button>
+        <button
+          onClick={() => setActiveTab('inventory')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'inventory'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Package size={16} />
+          Készlet
+        </button>
+        <button
+          onClick={() => setActiveTab('seo')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'seo'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Search size={16} />
+          SEO
         </button>
         <button
           onClick={() => setActiveTab('marketing')}
@@ -194,7 +255,18 @@ export default function AIDashboard() {
           }`}
         >
           <Wand2 size={16} />
-          Marketing Asszisztens
+          Marketing
+        </button>
+        <button
+          onClick={() => setActiveTab('responses')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'responses'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <MessageSquare size={16} />
+          Válasz Generátor
         </button>
         <button
           onClick={() => setActiveTab('analyzer')}
@@ -215,6 +287,18 @@ export default function AIDashboard() {
         <AIMarketingAssistant />
       ) : activeTab === 'analyzer' ? (
         <AIProductAnalyzer />
+      ) : activeTab === 'forecast' ? (
+        <AIForecastPanel />
+      ) : activeTab === 'segments' ? (
+        <AICustomerSegments />
+      ) : activeTab === 'anomaly' ? (
+        <AIAnomalyDetection />
+      ) : activeTab === 'inventory' ? (
+        <AIInventoryOptimization />
+      ) : activeTab === 'seo' ? (
+        <AISEOPanel />
+      ) : activeTab === 'responses' ? (
+        <AICustomerResponsePanel />
       ) : (
         <>
           {/* Stats Grid */}
