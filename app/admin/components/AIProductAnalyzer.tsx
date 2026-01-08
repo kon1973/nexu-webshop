@@ -20,9 +20,10 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { analyzeProduct as analyzeProductAction } from '@/lib/actions/ai-actions'
 
 interface ProductAnalysis {
-  productId: string
+  productId: string | number
   productName: string
   summary: string
   metrics: {
@@ -59,16 +60,13 @@ export default function AIProductAnalyzer() {
     setAnalysis(null)
 
     try {
-      const response = await fetch('/api/admin/ai-product-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery })
-      })
+      const data = await analyzeProductAction(searchQuery)
 
-      if (!response.ok) throw new Error('Analysis failed')
+      if ('error' in data) {
+        throw new Error(data.error)
+      }
 
-      const data = await response.json()
-      setAnalysis(data)
+      setAnalysis(data as ProductAnalysis)
       toast.success('Elemzés kész!')
     } catch (error) {
       console.error('Analysis error:', error)

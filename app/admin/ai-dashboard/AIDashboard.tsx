@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import AIInsightsPanel from '../components/AIInsightsPanel'
 import AIMarketingAssistant from '../components/AIMarketingAssistant'
 import AIProductAnalyzer from '../components/AIProductAnalyzer'
+import { getAIStats } from '@/lib/actions/ai-actions'
 
 interface ChatStats {
   totalConversations: number
@@ -38,11 +39,10 @@ export default function AIDashboard() {
   const fetchStats = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/admin/ai-stats?range=${timeRange}`)
-      if (response.ok) {
-        const data = await response.json()
+      const data = await getAIStats(timeRange)
+      if (data.success && data.stats) {
         setStats(data.stats)
-        setDailyStats(data.dailyStats)
+        setDailyStats(data.dailyStats || [])
       }
     } catch (error) {
       console.error('Failed to fetch AI stats:', error)

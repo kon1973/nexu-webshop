@@ -18,8 +18,7 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-
-type InsightType = 'sales-insights' | 'inventory-alerts' | 'pricing-suggestions' | 'review-summary' | 'marketing-ideas'
+import { generateAIInsight, type InsightType } from '@/lib/actions/ai-actions'
 
 interface InsightResult {
   content: string
@@ -82,22 +81,23 @@ export default function AIInsightsPanel() {
     setSelectedType(type)
     
     try {
-      const response = await fetch('/api/admin/ai-insights', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type })
-      })
+      const data = await generateAIInsight(type)
 
-      if (!response.ok) throw new Error('Failed to generate')
-
-      const data = await response.json()
+      if ('error' in data) {
+        throw new Error(data.error)
+      }
+      
+      // Extract content based on response type
+      const result = data as Record<string, unknown>
+      const content = result.insights || result.suggestions || result.summary || result.alerts || result.ideas
+      const contextData = result.data || result.stats || result.context
       
       setResults(prev => ({
         ...prev,
         [type]: {
-          content: data.insights || data.suggestions || data.summary || data.alerts || data.ideas,
-          data: data.data || data.stats || data.summary || data.context,
-          generatedAt: data.generatedAt
+          content: content as string,
+          data: contextData,
+          generatedAt: result.generatedAt as string
         }
       }))
       

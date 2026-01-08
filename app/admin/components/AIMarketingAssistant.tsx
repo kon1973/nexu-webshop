@@ -18,6 +18,7 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { generateMarketingContent } from '@/lib/actions/ai-actions'
 
 type ContentType = 'email' | 'social' | 'sms' | 'blog' | 'ad'
 type Tone = 'professional' | 'friendly' | 'urgent' | 'playful'
@@ -66,24 +67,21 @@ export default function AIMarketingAssistant() {
     setGeneratedContent(null)
 
     try {
-      const response = await fetch('/api/admin/ai-marketing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: selectedType,
-          tone,
-          topic,
-          targetAudience,
-          product,
-          promotion,
-          language
-        })
+      const data = await generateMarketingContent({
+        type: selectedType,
+        tone,
+        topic,
+        targetAudience,
+        product,
+        promotion,
+        language
       })
 
-      if (!response.ok) throw new Error('Generation failed')
+      if ('error' in data) {
+        throw new Error(data.error)
+      }
 
-      const data = await response.json()
-      setGeneratedContent(data)
+      setGeneratedContent(data as GeneratedContent)
       toast.success('Tartalom sikeresen generálva!')
     } catch (error) {
       console.error('Generation error:', error)
