@@ -6,6 +6,7 @@ import { useFavorites } from '@/context/FavoritesContext'
 import ProductCard from '@/app/components/ProductCard'
 import ProductCardList from '@/app/components/ProductCardList'
 import BannerCarousel from '@/app/components/BannerCarousel'
+import AISearchSuggestions from '@/app/components/AISearchSuggestions'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import type { Product, Banner, Category, Brand } from '@prisma/client'
 import { SearchX, X, ChevronLeft, ChevronRight, Loader2, LayoutGrid, List } from 'lucide-react'
@@ -536,6 +537,11 @@ export default function ShopClient({
 
             {/* Product Grid with Loading Overlay */}
             <div className="relative">
+              {/* AI Search Suggestions */}
+              {searchTerm && searchTerm.length >= 2 && (
+                <AISearchSuggestions query={searchTerm} />
+              )}
+
               {/* Loading overlay */}
               {isPending && (
                 <div className="absolute inset-0 bg-[#0a0a0a]/60 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
