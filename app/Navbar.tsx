@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback, memo } from 'react'
-import { Heart, ShoppingCart, User, LogOut, Search, ChevronDown, LayoutDashboard, Package, ArrowLeftRight, Menu, X, Home, Grid3X3, Settings, MapPin, Award } from 'lucide-react'
+import { Heart, ShoppingCart, User, LogOut, Search, ChevronDown, LayoutDashboard, Package, ArrowLeftRight, Menu, X, Home, Grid3X3, Settings, MapPin, Award, Sparkles } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useFavorites } from '@/context/FavoritesContext'
 import { useCompare } from '@/context/CompareContext'
@@ -175,6 +175,18 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
               }`}
             >
               Termékek
+            </Link>
+
+            <Link
+              href="/ai-tools"
+              className={`flex items-center gap-1.5 text-sm font-medium transition ${
+                isActivePath(pathname, '/ai-tools') 
+                  ? 'text-purple-400' 
+                  : 'text-gray-300 hover:text-purple-400'
+              }`}
+            >
+              <Sparkles size={14} />
+              AI Eszközök
             </Link>
 
             {/* Desktop Search Button */}
