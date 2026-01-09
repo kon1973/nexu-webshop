@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw, Brain, Wand2, BarChart3, LineChart, AlertTriangle, Layers, DollarSign, FileText, UserX, Gift, RotateCcw, Tag, PackageSearch } from 'lucide-react'
+import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw, Brain, Wand2, BarChart3, LineChart, AlertTriangle, Layers, DollarSign, FileText, UserX, Gift, RotateCcw, Tag, PackageSearch, Shield, FlaskConical, Eye, Star, Share2, Settings } from 'lucide-react'
 import { motion } from 'framer-motion'
 import AIInsightsPanel from '../components/AIInsightsPanel'
 import AIMarketingAssistant from '../components/AIMarketingAssistant'
@@ -19,6 +19,12 @@ import AISmartBundler from '../components/AISmartBundler'
 import AIReturnPredictor from '../components/AIReturnPredictor'
 import AIAutoTagging from '../components/AIAutoTagging'
 import AIInventoryPredictor from '../components/AIInventoryPredictor'
+import AIFraudDetection from '../components/AIFraudDetection'
+import AIABTestAnalyzer from '../components/AIABTestAnalyzer'
+import AICompetitorMonitor from '../components/AICompetitorMonitor'
+import AIReviewResponder from '../components/AIReviewResponder'
+import AISocialManager from '../components/AISocialManager'
+import AISettings from '../components/AISettings'
 import { getAIStats } from '@/lib/actions/ai-actions'
 
 interface ChatStats {
@@ -70,7 +76,7 @@ export default function AIDashboard() {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d')
-  const [activeTab, setActiveTab] = useState<'stats' | 'insights' | 'marketing' | 'analyzer' | 'forecast' | 'segments' | 'anomaly' | 'inventory' | 'seo' | 'responses' | 'pricing' | 'content' | 'churn' | 'bundles' | 'returns' | 'tagging' | 'stockforecast'>('stats')
+  const [activeTab, setActiveTab] = useState<'stats' | 'insights' | 'marketing' | 'analyzer' | 'forecast' | 'segments' | 'anomaly' | 'inventory' | 'seo' | 'responses' | 'pricing' | 'content' | 'churn' | 'bundles' | 'returns' | 'tagging' | 'stockforecast' | 'fraud' | 'abtest' | 'competitor' | 'reviews' | 'social' | 'settings'>('stats')
 
   useEffect(() => {
     fetchStats()
@@ -420,6 +426,72 @@ export default function AIDashboard() {
           <PackageSearch size={16} />
           Készlet Előrejelző
         </button>
+        <button
+          onClick={() => setActiveTab('fraud')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'fraud'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Shield size={16} />
+          Fraud Detekció
+        </button>
+        <button
+          onClick={() => setActiveTab('abtest')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'abtest'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <FlaskConical size={16} />
+          A/B Tesztek
+        </button>
+        <button
+          onClick={() => setActiveTab('competitor')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'competitor'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Eye size={16} />
+          Versenytárs Monitor
+        </button>
+        <button
+          onClick={() => setActiveTab('reviews')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'reviews'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Star size={16} />
+          Értékelés Válasz
+        </button>
+        <button
+          onClick={() => setActiveTab('social')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'social'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Share2 size={16} />
+          Social Media
+        </button>
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'settings'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Settings size={16} />
+          Beállítások
+        </button>
       </div>
 
       {activeTab === 'insights' ? (
@@ -454,6 +526,18 @@ export default function AIDashboard() {
         <AIAutoTagging />
       ) : activeTab === 'stockforecast' ? (
         <AIInventoryPredictor />
+      ) : activeTab === 'fraud' ? (
+        <AIFraudDetection />
+      ) : activeTab === 'abtest' ? (
+        <AIABTestAnalyzer />
+      ) : activeTab === 'competitor' ? (
+        <AICompetitorMonitor />
+      ) : activeTab === 'reviews' ? (
+        <AIReviewResponder />
+      ) : activeTab === 'social' ? (
+        <AISocialManager />
+      ) : activeTab === 'settings' ? (
+        <AISettings />
       ) : (
         <>
           {/* Stats Grid */}
