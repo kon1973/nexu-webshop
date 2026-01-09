@@ -486,3 +486,59 @@ model PriceAlert {
   @@index([triggered])
   @@index([email])
 }
+
+// Gift Card System
+model GiftCard {
+  id              String    @id @default(cuid())
+  code            String    @unique // Unique gift card code (e.g., NEXU-XXXX-XXXX)
+  amount          Int       // Original gift card amount in HUF
+  balance         Int       // Current balance
+  design          String    @default("classic") // Design template
+  
+  // Sender/Buyer info
+  buyerId         String?   // User who purchased the gift card
+  senderName      String?   // Name to show on the card
+  senderEmail     String?   // Email of sender
+  
+  // Recipient info
+  recipientName   String
+  recipientEmail  String
+  message         String?   @db.Text // Personal message
+  
+  // Delivery
+  deliveryDate    DateTime? // When to send the email
+  deliveredAt     DateTime? // When email was sent
+  
+  // Status
+  status          String    @default("pending") // pending, active, redeemed, expired
+  purchasedAt     DateTime  @default(now())
+  activatedAt     DateTime? // When first used
+  expiresAt       DateTime  // Expiration date (typically 1 year)
+  
+  // Stripe/Payment
+  stripePaymentId String?   // Stripe payment intent ID
+  
+  // Relations
+  redemptions     GiftCardRedemption[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([code])
+  @@index([recipientEmail])
+  @@index([buyerId])
+  @@index([status])
+}
+
+model GiftCardRedemption {
+  id          String   @id @default(cuid())
+  giftCardId  String
+  giftCard    GiftCard @relation(fields: [giftCardId], references: [id])
+  orderId     String?  // Order where gift card was used
+  amount      Int      // Amount redeemed
+  usedAt      DateTime @default(now())
+  
+  @@index([giftCardId])
+  @@index([orderId])
+}
+

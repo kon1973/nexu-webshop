@@ -304,6 +304,13 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
                             <Award size={16} /> Hűségprogram
                           </Link>
                           <Link
+                            href="/profile/gift-cards" 
+                            onClick={() => setIsProfileOpen(false)}
+                            className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-pink-400 hover:bg-pink-500/10 rounded-lg transition-colors"
+                          >
+                            <Gift size={16} /> Ajándékkártyáim
+                          </Link>
+                          <Link
                             href="/profile/settings" 
                             onClick={() => setIsProfileOpen(false)}
                             className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
@@ -558,6 +565,19 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
                     >
                       <Award size={20} />
                       <span className="font-medium">Hűségprogram</span>
+                    </Link>
+
+                    <Link
+                      href="/profile/gift-cards"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                        pathname === '/profile/gift-cards' 
+                          ? 'bg-pink-500/20 text-pink-400' 
+                          : 'text-gray-300 hover:bg-white/5 hover:text-pink-400'
+                      }`}
+                    >
+                      <Gift size={20} />
+                      <span className="font-medium">Ajándékkártyáim</span>
                     </Link>
 
                     <Link

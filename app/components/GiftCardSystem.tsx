@@ -87,12 +87,27 @@ export default function GiftCardSystem({ onPurchase }: GiftCardSystemProps) {
     setIsSubmitting(true)
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      const response = await fetch('/api/gift-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: formData.amount,
+          recipientName: formData.recipientName,
+          recipientEmail: formData.recipientEmail,
+          senderName: formData.senderName,
+          message: formData.message,
+          deliveryDate: formData.deliveryDate,
+          design: formData.design
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Hiba történt')
+      }
       
-      // Generate mock gift card code
-      const code = `NEXU-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-      setGiftCardCode(code)
+      setGiftCardCode(data.giftCard.code)
       
       if (onPurchase) {
         onPurchase(formData)
@@ -100,8 +115,8 @@ export default function GiftCardSystem({ onPurchase }: GiftCardSystemProps) {
       
       setStep(4)
       toast.success('Ajándékkártya sikeresen megvásárolva!')
-    } catch {
-      toast.error('Hiba történt a vásárlás során')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Hiba történt a vásárlás során')
     } finally {
       setIsSubmitting(false)
     }
