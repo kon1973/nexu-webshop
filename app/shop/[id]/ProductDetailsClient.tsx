@@ -12,6 +12,9 @@ import FavoriteButton from '@/app/components/FavoriteButton'
 import ShareButton from '@/app/components/ShareButton'
 import ReviewForm from '@/app/components/ReviewForm'
 import CountdownTimer from '@/app/components/CountdownTimer'
+import AIReviewSummary from '@/app/components/AIReviewSummary'
+import AIProductQA from '@/app/components/AIProductQA'
+import AIPricePredictor from '@/app/components/AIPricePredictor'
 import type { Product, Review } from '@prisma/client'
 import { getImageUrl } from '@/lib/image'
 import { createPortal } from 'react-dom'
@@ -542,6 +545,15 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
                     : 'Raktáron'}
               </span>
             </div>
+
+            {/* AI Price Prediction */}
+            <div className="mt-4">
+              <AIPricePredictor 
+                productId={product.id} 
+                currentPrice={currentPrice || product.price}
+                originalPrice={originalPrice}
+              />
+            </div>
           </div>
 
           <p className="text-gray-400 leading-relaxed text-lg">
@@ -978,7 +990,13 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
             )}
 
             {activeTab === 'reviews' && (
-              <div className="max-w-4xl mx-auto">
+              <div className="max-w-4xl mx-auto space-y-8">
+                {/* AI Review Summary */}
+                <AIReviewSummary productId={product.id} productName={product.name} />
+
+                {/* AI Product Q&A */}
+                <AIProductQA productId={product.id} productName={product.name} />
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
                   <div className="md:col-span-1 space-y-8">
                     {/* Rating Distribution */}

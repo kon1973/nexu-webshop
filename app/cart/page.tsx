@@ -12,6 +12,7 @@ import { useSession } from 'next-auth/react'
 import { validateCoupon } from './actions'
 import { getCartRecommendations, getUserLoyaltyInfo, checkStockAvailability } from './cart-actions'
 import { getImageUrl } from '@/lib/image'
+import AISmartCartUpsell from '@/app/components/AISmartCartUpsell'
 
 type RecommendedProduct = {
   id: number
@@ -539,6 +540,9 @@ export default function CartPage() {
             </div>
           </div>
         </div>
+
+        {/* AI Smart Cart Upsell Section */}
+        <AISmartCartUpsell />
 
         {/* Recommendations Section */}
         {recommendations.length > 0 && (

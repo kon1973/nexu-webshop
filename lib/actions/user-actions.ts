@@ -780,7 +780,11 @@ export async function compareProductsWithAI(productIds: number[]) {
       where: { id: { in: productIds } },
       include: {
         brand: true,
-        reviews: { take: 5, orderBy: { createdAt: 'desc' } }
+        reviews: { 
+          where: { status: 'approved' },
+          take: 10, 
+          orderBy: { createdAt: 'desc' } 
+        }
       }
     })
 
@@ -788,72 +792,218 @@ export async function compareProductsWithAI(productIds: number[]) {
       return { success: false, error: 'Nem található elég termék' }
     }
 
-    // Prepare data for AI
-    const productData = products.map(p => ({
-      name: p.name,
-      brand: p.brand?.name || 'N/A',
-      price: p.salePrice || p.price,
-      originalPrice: p.salePrice ? p.price : null,
-      category: p.category,
-      rating: p.rating,
-      reviewCount: p.reviews.length,
-      specifications: p.specifications,
-      inStock: p.stock > 0
-    }))
+    // Prepare detailed data for AI
+    const productData = products.map(p => {
+      const specs = p.specifications as Array<{ key: string; value: string }> | null
+      return {
+        id: p.id,
+        name: p.name,
+        brand: p.brand?.name || 'Ismeretlen',
+        price: p.salePrice || p.price,
+        originalPrice: p.salePrice ? p.price : null,
+        discount: p.salePrice ? Math.round((1 - p.salePrice / p.price) * 100) : 0,
+        category: p.category,
+        rating: p.rating,
+        reviewCount: p.reviews.length,
+        avgReviewSentiment: p.reviews.length > 0 
+          ? (p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length).toFixed(1)
+          : 'N/A',
+        specifications: specs?.slice(0, 15).map(s => `${s.key}: ${s.value}`).join(', ') || 'Nincs specifikáció',
+        stock: p.stock,
+        inStock: p.stock > 0,
+        description: p.description?.substring(0, 200) || ''
+      }
+    })
 
     const comparison = await openai.chat.completions.create({
-      model: 'gpt-5-mini',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: `Te egy e-commerce termék-összehasonlító szakértő vagy. Hasonlítsd össze a termékeket és adj részletes elemzést magyarul.
+          content: `Te egy e-commerce termék-összehasonlító szakértő vagy. Részletesen elemezd és hasonlítsd össze a termékeket magyarul.
 
-Válaszolj JSON formátumban:
+FONTOS: A válaszban a "winner" és minden "productId" mezőben a termék SZÁMSZERŰ ID-ját add meg (number típusként), NEM a nevét!
+
+Válaszolj PONTOSAN ebben a JSON formátumban:
 {
-  "summary": "Rövid összefoglaló (1-2 mondat)",
   "winner": {
-    "name": "A legjobb választás neve",
-    "reason": "Miért ez a legjobb"
+    "productId": <termék_id_szám>,
+    "reason": "Részletes indoklás, miért ez a legjobb választás (2-3 mondat)"
   },
-  "comparison": [
+  "categories": [
     {
-      "aspect": "Ár-érték arány",
-      "analysis": "Elemzés",
-      "best": "Termék neve"
+      "name": "Ár-érték arány",
+      "winner": <győztes_termék_id vagy null ha döntetlen>,
+      "explanation": "Rövid magyarázat"
+    },
+    {
+      "name": "Teljesítmény/Minőség",
+      "winner": <győztes_termék_id vagy null>,
+      "explanation": "Rövid magyarázat"
+    },
+    {
+      "name": "Vásárlói elégedettség",
+      "winner": <győztes_termék_id vagy null>,
+      "explanation": "Rövid magyarázat"
+    },
+    {
+      "name": "Funkciók/Felszereltség",
+      "winner": <győztes_termék_id vagy null>,
+      "explanation": "Rövid magyarázat"
     }
   ],
-  "recommendations": {
-    "budget": "Ajánlás költségtudatos vásárlóknak",
-    "performance": "Ajánlás teljesítményt keresőknek",
-    "value": "Legjobb ár-érték arány"
-  }
+  "prosAndCons": [
+    {
+      "productId": <termék_id>,
+      "pros": ["Előny 1", "Előny 2", "Előny 3"],
+      "cons": ["Hátrány 1", "Hátrány 2"]
+    }
+  ],
+  "recommendation": "Általános vásárlási javaslat (2-3 mondat)",
+  "forWhom": [
+    {
+      "productId": <termék_id>,
+      "bestFor": ["Célcsoport 1", "Célcsoport 2"]
+    }
+  ],
+  "quickVerdict": "Egyetlen mondatos összefoglaló, melyik a legjobb és miért"
 }`
         },
         {
           role: 'user',
-          content: `Hasonlítsd össze ezeket a termékeket:\n${JSON.stringify(productData, null, 2)}`
+          content: `Hasonlítsd össze részletesen ezeket a termékeket:\n\n${productData.map(p => 
+            `ID: ${p.id}\nNév: ${p.name}\nMárka: ${p.brand}\nÁr: ${p.price} Ft${p.discount > 0 ? ` (-${p.discount}%)` : ''}\nKategória: ${p.category}\nÉrtékelés: ${p.rating}/5 (${p.reviewCount} vélemény)\nKészlet: ${p.inStock ? 'Raktáron' : 'Nincs készleten'}\nSpecifikációk: ${p.specifications}\nLeírás: ${p.description}`
+          ).join('\n\n---\n\n')}`
         }
       ],
       response_format: { type: 'json_object' },
-      max_tokens: 800,
+      max_tokens: 1200,
       temperature: 0.7
     })
 
-    let aiComparison = {}
+    let aiComparison = null
     try {
       aiComparison = JSON.parse(comparison.choices[0]?.message?.content || '{}')
     } catch {
-      aiComparison = { summary: 'Az összehasonlítás nem sikerült.' }
+      return { success: false, error: 'Az AI válasz feldolgozása sikertelen' }
     }
 
     return {
       success: true,
-      products,
-      aiComparison
+      comparison: aiComparison,
+      products: products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.salePrice || p.price,
+        originalPrice: p.salePrice ? p.price : null,
+        image: p.image,
+        brand: p.brand?.name,
+        category: p.category,
+        rating: p.rating,
+        stock: p.stock
+      }))
     }
   } catch (error) {
     console.error('Compare products error:', error)
     return { success: false, error: 'Hiba az összehasonlítás során' }
+  }
+}
+
+// ============================================================================
+// AI PURCHASE DECISION HELPER - Vásárlási döntés segítő
+// ============================================================================
+
+export async function getAIPurchaseAdvice(productIds: number[], userContext?: {
+  budget?: number
+  priorities?: string[]
+  useCase?: string
+}) {
+  try {
+    if (productIds.length === 0) {
+      return { success: false, error: 'Nincs termék megadva' }
+    }
+
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      include: {
+        brand: true,
+        reviews: {
+          where: { status: 'approved' },
+          take: 5
+        }
+      }
+    })
+
+    if (products.length === 0) {
+      return { success: false, error: 'Termékek nem találhatók' }
+    }
+
+    const productSummary = products.map(p => ({
+      id: p.id,
+      name: p.name,
+      brand: p.brand?.name,
+      price: p.salePrice || p.price,
+      rating: p.rating,
+      inStock: p.stock > 0,
+      category: p.category
+    }))
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy személyes vásárlási tanácsadó vagy. A felhasználó preferenciái alapján adj személyre szabott tanácsot magyarul.
+
+Válaszolj JSON formátumban:
+{
+  "topPick": {
+    "productId": <ajánlott_termék_id>,
+    "confidence": 0-100,
+    "reasoning": "Részletes indoklás"
+  },
+  "alternatives": [
+    {
+      "productId": <másik_termék_id>,
+      "scenario": "Mikor válaszd ezt helyette"
+    }
+  ],
+  "warnings": ["Figyelmeztető megjegyzések, ha vannak"],
+  "tips": ["Hasznos vásárlási tippek"],
+  "verdict": "Végleges ajánlás 1-2 mondatban"
+}`
+        },
+        {
+          role: 'user',
+          content: `Termékek: ${JSON.stringify(productSummary)}
+          
+${userContext?.budget ? `Budget: ${userContext.budget} Ft` : ''}
+${userContext?.priorities?.length ? `Prioritások: ${userContext.priorities.join(', ')}` : ''}
+${userContext?.useCase ? `Felhasználás: ${userContext.useCase}` : ''}
+
+Adj személyre szabott vásárlási tanácsot!`
+        }
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 600,
+      temperature: 0.7
+    })
+
+    let advice = null
+    try {
+      advice = JSON.parse(response.choices[0]?.message?.content || '{}')
+    } catch {
+      return { success: false, error: 'Az AI válasz feldolgozása sikertelen' }
+    }
+
+    return {
+      success: true,
+      advice,
+      products: productSummary
+    }
+  } catch (error) {
+    console.error('Purchase advice error:', error)
+    return { success: false, error: 'Hiba a tanács generálásakor' }
   }
 }
 
@@ -1339,5 +1489,609 @@ export async function analyzeWishlist(productIds: number[]) {
   } catch (error) {
     console.error('Wishlist analysis error:', error)
     return { success: false, error: 'Hiba történt az elemzés során' }
+  }
+}
+
+// ============================================================================
+// AI REVIEW SUMMARY - Értékelések összefoglalása a termékoldalakon
+// ============================================================================
+
+export async function getAIReviewSummary(productId: number) {
+  try {
+    // Fetch approved reviews
+    const reviews = await prisma.review.findMany({
+      where: { 
+        productId,
+        status: 'approved'
+      },
+      select: {
+        rating: true,
+        text: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    })
+
+    if (reviews.length < 3) {
+      return { 
+        success: true, 
+        hasSummary: false,
+        message: 'Még nincs elég értékelés az összefoglaláshoz'
+      }
+    }
+
+    // Calculate statistics
+    const totalReviews = reviews.length
+    const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews
+    const ratingDistribution = {
+      5: reviews.filter(r => r.rating === 5).length,
+      4: reviews.filter(r => r.rating === 4).length,
+      3: reviews.filter(r => r.rating === 3).length,
+      2: reviews.filter(r => r.rating === 2).length,
+      1: reviews.filter(r => r.rating === 1).length
+    }
+
+    // Prepare reviews for AI
+    const reviewTexts = reviews
+      .filter(r => r.text && r.text.length > 10)
+      .slice(0, 20)
+      .map(r => `[${r.rating}/5]: ${r.text}`)
+      .join('\n')
+
+    if (!reviewTexts) {
+      return {
+        success: true,
+        hasSummary: true,
+        summary: {
+          avgRating: Math.round(avgRating * 10) / 10,
+          totalReviews,
+          ratingDistribution,
+          aiSummary: null,
+          pros: [],
+          cons: []
+        }
+      }
+    }
+
+    // Generate AI summary
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy értékelés-elemző AI vagy. Elemezd a vásárlói véleményeket és adj összefoglalót.
+Válaszolj JSON formátumban:
+{
+  "summary": "2-3 mondatos összefoglaló a vélemények alapján (max 200 karakter)",
+  "pros": ["max 3 pozitívum rövidítve"],
+  "cons": ["max 2 negatívum rövidítve, ha van"],
+  "sentiment": "positive" | "mixed" | "negative",
+  "recommendationRate": 0-100 közötti szám (mennyire ajánlják)
+}`
+        },
+        {
+          role: 'user',
+          content: `Értékelések:\n${reviewTexts}\n\nÁtlagos értékelés: ${avgRating.toFixed(1)}/5`
+        }
+      ],
+      max_tokens: 300,
+      temperature: 0.5
+    })
+
+    const aiContent = response.choices[0]?.message?.content
+    let aiAnalysis = {
+      summary: 'A vásárlók általában elégedettek a termékkel.',
+      pros: [] as string[],
+      cons: [] as string[],
+      sentiment: 'positive' as 'positive' | 'mixed' | 'negative',
+      recommendationRate: Math.round(avgRating * 20)
+    }
+
+    if (aiContent) {
+      try {
+        const parsed = JSON.parse(aiContent)
+        aiAnalysis = {
+          summary: parsed.summary || aiAnalysis.summary,
+          pros: parsed.pros || [],
+          cons: parsed.cons || [],
+          sentiment: parsed.sentiment || 'positive',
+          recommendationRate: parsed.recommendationRate || aiAnalysis.recommendationRate
+        }
+      } catch {
+        // Use default if parsing fails
+      }
+    }
+
+    return {
+      success: true,
+      hasSummary: true,
+      summary: {
+        avgRating: Math.round(avgRating * 10) / 10,
+        totalReviews,
+        ratingDistribution,
+        ...aiAnalysis
+      }
+    }
+  } catch (error) {
+    console.error('AI review summary error:', error)
+    return { success: false, error: 'Hiba az összefoglaló generálásakor' }
+  }
+}
+
+// ============================================================================
+// AI PRODUCT Q&A - Kérdés-válasz a termékről
+// ============================================================================
+
+export async function askProductQuestion(productId: number, question: string) {
+  try {
+    if (!question || question.length < 5) {
+      return { success: false, error: 'Túl rövid kérdés' }
+    }
+
+    // Fetch product details
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        brand: true,
+        reviews: {
+          where: { status: 'approved' },
+          take: 10,
+          select: { text: true, rating: true }
+        }
+      }
+    })
+
+    if (!product) {
+      return { success: false, error: 'Termék nem található' }
+    }
+
+    // Build product context
+    const specs = product.specifications as Array<{ key: string; value: string }> | null
+    const specText = specs?.map(s => `${s.key}: ${s.value}`).join(', ') || 'Nincs részletes specifikáció'
+    
+    const reviewSummary = product.reviews.length > 0 
+      ? `Vásárlói vélemények: ${product.reviews.map(r => `"${r.text?.substring(0, 100)}"`).join('; ')}`
+      : ''
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te a NEXU webshop termékszakértője vagy. Válaszolj a vásárló kérdésére a megadott termékadatok alapján.
+
+Szabályok:
+- Csak a megadott információk alapján válaszolj
+- Ha nem tudod a választ, mondd el őszintén
+- Rövid, tömör válasz (max 150 szó)
+- Magyar nyelven
+- Barátságos, segítőkész hangnem
+- Ha releváns, említsd meg a garanciát vagy visszaküldési lehetőséget`
+        },
+        {
+          role: 'user',
+          content: `Termék: ${product.name}
+Márka: ${product.brand?.name || 'Nincs megadva'}
+Kategória: ${product.category}
+Ár: ${product.salePrice || product.price} Ft
+Leírás: ${product.description || 'Nincs leírás'}
+Specifikációk: ${specText}
+Készlet: ${product.stock > 0 ? `${product.stock} db` : 'Nincs készleten'}
+${reviewSummary}
+
+Kérdés: ${question}`
+        }
+      ],
+      max_tokens: 250,
+      temperature: 0.7
+    })
+
+    const answer = response.choices[0]?.message?.content || 'Sajnos nem tudok válaszolni erre a kérdésre.'
+
+    // Generate follow-up suggestions
+    const followUpResponse = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Adj 3 releváns követő kérdést a termékről. Csak a kérdéseket add vissza, JSON tömbben: ["kérdés1", "kérdés2", "kérdés3"]'
+        },
+        {
+          role: 'user',
+          content: `Termék: ${product.name}\nKategória: ${product.category}\nEredeti kérdés: ${question}`
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.8
+    })
+
+    let followUpQuestions: string[] = []
+    try {
+      const followUpContent = followUpResponse.choices[0]?.message?.content
+      if (followUpContent) {
+        followUpQuestions = JSON.parse(followUpContent)
+      }
+    } catch {
+      followUpQuestions = [
+        'Milyen garancia jár a termékhez?',
+        'Mikor érkezik meg a szállítás?',
+        'Van-e tartozék a csomagban?'
+      ]
+    }
+
+    return {
+      success: true,
+      answer,
+      followUpQuestions,
+      productInfo: {
+        name: product.name,
+        price: product.salePrice || product.price,
+        inStock: product.stock > 0
+      }
+    }
+  } catch (error) {
+    console.error('Product Q&A error:', error)
+    return { success: false, error: 'Hiba a válasz generálásakor' }
+  }
+}
+
+// ============================================================================
+// AI SMART CART SUGGESTIONS - Kosár intelligens kiegészítő ajánlások
+// ============================================================================
+
+export async function getSmartCartSuggestions(cartProductIds: number[]) {
+  try {
+    if (cartProductIds.length === 0) {
+      return { success: true, suggestions: [], bundles: [] }
+    }
+
+    // Get cart products
+    const cartProducts = await prisma.product.findMany({
+      where: { id: { in: cartProductIds } },
+      include: { brand: true }
+    })
+
+    const categories = [...new Set(cartProducts.map(p => p.category))]
+    const brands = [...new Set(cartProducts.map(p => p.brand?.name).filter(Boolean))]
+    const totalCartValue = cartProducts.reduce((sum, p) => sum + (p.salePrice || p.price), 0)
+
+    // Find complementary products
+    const complementaryProducts = await prisma.product.findMany({
+      where: {
+        id: { notIn: cartProductIds },
+        isArchived: false,
+        OR: [
+          // Accessories for the same category
+          { 
+            category: { contains: 'Kiegészítő' }
+          },
+          // Same brand, different category
+          {
+            brand: { name: { in: brands as string[] } },
+            category: { notIn: categories }
+          },
+          // Lower price items (impulse buys)
+          {
+            price: { lte: totalCartValue * 0.2 }
+          }
+        ]
+      },
+      include: { brand: true },
+      take: 20,
+      orderBy: { rating: 'desc' }
+    })
+
+    // Use AI to rank and explain suggestions
+    const productContext = cartProducts.map(p => `${p.name} (${p.category})`).join(', ')
+    const suggestionContext = complementaryProducts.slice(0, 10).map(p => 
+      `ID:${p.id}|${p.name}|${p.category}|${p.price}Ft`
+    ).join('\n')
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy intelligens e-commerce ajánló rendszer vagy. A kosár tartalma alapján válaszd ki a legjobb 3 kiegészítő terméket.
+
+Válaszolj JSON formátumban:
+{
+  "suggestions": [
+    {"id": termék_id, "reason": "rövid indoklás (max 30 karakter)"}
+  ],
+  "bundleIdea": {
+    "name": "csomag neve",
+    "description": "miért éri meg (max 50 karakter)",
+    "discountPercent": 5-15 közötti szám
+  }
+}`
+        },
+        {
+          role: 'user',
+          content: `Kosár tartalma: ${productContext}\n\nLehetséges ajánlások:\n${suggestionContext}`
+        }
+      ],
+      max_tokens: 300,
+      temperature: 0.7
+    })
+
+    let aiSuggestions: { id: number; reason: string }[] = []
+    let bundleIdea: { name: string; description: string; discountPercent: number } | null = null
+
+    try {
+      const content = response.choices[0]?.message?.content
+      if (content) {
+        const parsed = JSON.parse(content)
+        aiSuggestions = parsed.suggestions || []
+        bundleIdea = parsed.bundleIdea || null
+      }
+    } catch {
+      // Fallback to simple recommendations
+    }
+
+    // Build final suggestions
+    const suggestedIds = aiSuggestions.map(s => s.id)
+    const suggestions = complementaryProducts
+      .filter(p => suggestedIds.includes(p.id) || aiSuggestions.length === 0)
+      .slice(0, 4)
+      .map(product => {
+        const aiReason = aiSuggestions.find(s => s.id === product.id)?.reason
+        return {
+          id: product.id,
+          name: product.name,
+          slug: product.slug || String(product.id),
+          price: product.salePrice || product.price,
+          originalPrice: product.salePrice ? product.price : null,
+          image: product.image,
+          category: product.category,
+          reason: aiReason || 'Ajánlott kiegészítő'
+        }
+      })
+
+    // Build bundle if AI suggested one
+    const bundles = bundleIdea ? [{
+      name: bundleIdea.name,
+      description: bundleIdea.description,
+      products: cartProducts.slice(0, 3).map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.salePrice || p.price
+      })),
+      discountPercent: bundleIdea.discountPercent,
+      originalTotal: totalCartValue,
+      discountedTotal: Math.round(totalCartValue * (1 - bundleIdea.discountPercent / 100))
+    }] : []
+
+    return {
+      success: true,
+      suggestions,
+      bundles,
+      freeShippingRemaining: Math.max(0, 30000 - totalCartValue),
+      cartInsight: totalCartValue > 50000 
+        ? '🎉 Kiváló választás! VIP kedvezményre jogosult vagy.'
+        : totalCartValue > 30000 
+          ? '✨ Ingyenes szállítás jár a rendelésedhez!'
+          : `📦 Még ${(30000 - totalCartValue).toLocaleString('hu-HU')} Ft-ot rendelj az ingyenes szállításhoz!`
+    }
+  } catch (error) {
+    console.error('Smart cart suggestions error:', error)
+    return { success: false, error: 'Hiba az ajánlások betöltésekor' }
+  }
+}
+
+// ============================================================================
+// AI PRICE PREDICTION - Ár előrejelzés vásárlóknak
+// ============================================================================
+
+export async function getPricePrediction(productId: number) {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        salePrice: true,
+        saleStartDate: true,
+        saleEndDate: true,
+        category: true,
+        stock: true,
+        createdAt: true
+      }
+    })
+
+    if (!product) {
+      return { success: false, error: 'Termék nem található' }
+    }
+
+    const currentPrice = product.salePrice || product.price
+    const isOnSale = !!product.salePrice
+
+    // Check if sale is ending soon
+    const saleEndingSoon = product.saleEndDate && 
+      new Date(product.saleEndDate).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000
+
+    // Check historical sales patterns (simplified - in production would use actual price history)
+    const dayOfWeek = new Date().getDay()
+    const monthOfYear = new Date().getMonth()
+    
+    // Black Friday / Holiday season (November-December)
+    const isHolidaySeason = monthOfYear === 10 || monthOfYear === 11
+    
+    // Weekend sales
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+
+    // Generate prediction
+    let prediction: {
+      trend: 'up' | 'down' | 'stable'
+      confidence: number
+      reasoning: string
+      recommendation: string
+      bestTimeToBy: string
+    }
+
+    if (isOnSale && saleEndingSoon) {
+      prediction = {
+        trend: 'up',
+        confidence: 85,
+        reasoning: 'Az akció hamarosan véget ér',
+        recommendation: 'Érdemes most megvenni, amíg az akciós ár érvényes!',
+        bestTimeToBy: 'Most!'
+      }
+    } else if (product.stock < 5 && product.stock > 0) {
+      prediction = {
+        trend: 'stable',
+        confidence: 70,
+        reasoning: 'Alacsony készlet, várhatóan nem lesz további akció',
+        recommendation: 'Javasolt megvenni, mielőtt elfogy',
+        bestTimeToBy: 'A készlet erejéig'
+      }
+    } else if (isHolidaySeason && !isOnSale) {
+      prediction = {
+        trend: 'down',
+        confidence: 65,
+        reasoning: 'Ünnepi szezon - várhatóak akciók',
+        recommendation: 'Érdemes várni a Black Friday / karácsonyi akciókra',
+        bestTimeToBy: 'November vége'
+      }
+    } else if (isOnSale) {
+      prediction = {
+        trend: 'up',
+        confidence: 60,
+        reasoning: 'Jelenleg akciós ár',
+        recommendation: 'Az akciós ár kedvező, megéri kihasználni',
+        bestTimeToBy: 'Most'
+      }
+    } else {
+      prediction = {
+        trend: 'stable',
+        confidence: 50,
+        reasoning: 'Nincs jelentős árváltozás várható',
+        recommendation: 'Bármikor megveheted, stabil az ár',
+        bestTimeToBy: 'Bármikor'
+      }
+    }
+
+    return {
+      success: true,
+      product: {
+        id: product.id,
+        name: product.name,
+        currentPrice,
+        originalPrice: isOnSale ? product.price : null,
+        isOnSale
+      },
+      prediction,
+      priceAlertAvailable: true
+    }
+  } catch (error) {
+    console.error('Price prediction error:', error)
+    return { success: false, error: 'Hiba az előrejelzés generálásakor' }
+  }
+}
+
+// ============================================================================
+// AI SIZE/VARIANT RECOMMENDER - Méret/variáns ajánló
+// ============================================================================
+
+export async function getVariantRecommendation(productId: number, userPreferences?: {
+  previousPurchases?: { productId: number; variantId: string }[]
+  preferredBrands?: string[]
+}) {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        variants: {
+          where: { isActive: true }
+        },
+        brand: true
+      }
+    })
+
+    if (!product) {
+      return { success: false, error: 'Termék nem található' }
+    }
+
+    if (!product.variants || product.variants.length === 0) {
+      return { 
+        success: true, 
+        hasVariants: false,
+        message: 'Ennek a terméknek nincs variánsa'
+      }
+    }
+
+    // Analyze variants
+    const variantAnalysis = product.variants.map(variant => {
+      const attrs = variant.attributes as Record<string, string> | null
+      const stockStatus = variant.stock > 10 ? 'plenty' : variant.stock > 0 ? 'low' : 'out'
+      const isOnSale = !!variant.salePrice
+      const price = variant.salePrice || variant.price
+
+      return {
+        id: variant.id,
+        sku: variant.sku,
+        attributes: attrs || {},
+        price,
+        isOnSale,
+        stock: variant.stock,
+        stockStatus,
+        images: variant.images as string[]
+      }
+    })
+
+    // Find most popular (highest stock usually indicates bestseller)
+    const sortedByStock = [...variantAnalysis].sort((a, b) => b.stock - a.stock)
+    const mostPopular = sortedByStock[0]
+
+    // Find best value (sale items)
+    const saleVariants = variantAnalysis.filter(v => v.isOnSale)
+    const bestValue = saleVariants.length > 0 
+      ? saleVariants.reduce((a, b) => a.price < b.price ? a : b)
+      : null
+
+    // Get available attributes
+    const availableAttributes: Record<string, string[]> = {}
+    variantAnalysis.forEach(v => {
+      Object.entries(v.attributes).forEach(([key, value]) => {
+        if (!availableAttributes[key]) {
+          availableAttributes[key] = []
+        }
+        if (!availableAttributes[key].includes(value)) {
+          availableAttributes[key].push(value)
+        }
+      })
+    })
+
+    return {
+      success: true,
+      hasVariants: true,
+      productName: product.name,
+      totalVariants: product.variants.length,
+      availableAttributes,
+      recommendations: {
+        mostPopular: mostPopular ? {
+          id: mostPopular.id,
+          attributes: mostPopular.attributes,
+          reason: 'Legnépszerűbb választás',
+          price: mostPopular.price,
+          inStock: mostPopular.stock > 0
+        } : null,
+        bestValue: bestValue ? {
+          id: bestValue.id,
+          attributes: bestValue.attributes,
+          reason: 'Legjobb ár-érték arány',
+          price: bestValue.price,
+          savings: Math.round(((variantAnalysis.find(v => !v.isOnSale)?.price || bestValue.price) - bestValue.price)),
+          inStock: bestValue.stock > 0
+        } : null,
+        inStockVariants: variantAnalysis.filter(v => v.stock > 0).length
+      },
+      allVariants: variantAnalysis
+    }
+  } catch (error) {
+    console.error('Variant recommendation error:', error)
+    return { success: false, error: 'Hiba a variáns ajánlásakor' }
   }
 }

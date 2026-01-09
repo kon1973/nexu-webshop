@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw, Brain, Wand2, BarChart3, LineChart, AlertTriangle, Layers } from 'lucide-react'
+import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw, Brain, Wand2, BarChart3, LineChart, AlertTriangle, Layers, DollarSign, FileText, UserX, Gift } from 'lucide-react'
 import { motion } from 'framer-motion'
 import AIInsightsPanel from '../components/AIInsightsPanel'
 import AIMarketingAssistant from '../components/AIMarketingAssistant'
@@ -12,6 +12,10 @@ import AIAnomalyDetection from '../components/AIAnomalyDetection'
 import AIInventoryOptimization from '../components/AIInventoryOptimization'
 import AISEOPanel from '../components/AISEOPanel'
 import AICustomerResponsePanel from '../components/AICustomerResponsePanel'
+import AIPriceOptimizer from '../components/AIPriceOptimizer'
+import AIContentStudio from '../components/AIContentStudio'
+import AIChurnPrediction from '../components/AIChurnPrediction'
+import AISmartBundler from '../components/AISmartBundler'
 import { getAIStats } from '@/lib/actions/ai-actions'
 
 interface ChatStats {
@@ -23,6 +27,33 @@ interface ChatStats {
   orderLookups: number
   cartAdditions: number
   conversionRate: number
+  changes?: {
+    conversations: string
+    messages: string
+    productSearches: string
+    cartAdditions: string
+    orderLookups: string
+    conversionRate: string
+  }
+  aiPerformance?: {
+    avgResponseTime: number
+    avgResponseTimeChange: string
+    avgResponseTimePositive: boolean
+    successRate: number
+    successRateChange: string
+    successRatePositive: boolean
+    toolCalls: number
+    toolCallsChange: string
+    toolCallsPositive: boolean
+  }
+  modelInfo?: {
+    chatbotModel: string
+    contentModel: string
+    maxTokens: number
+    temperature: number
+    activeTools: number
+    status: 'active' | 'inactive'
+  }
 }
 
 interface DailyStats {
@@ -36,7 +67,7 @@ export default function AIDashboard() {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d')
-  const [activeTab, setActiveTab] = useState<'stats' | 'insights' | 'marketing' | 'analyzer' | 'forecast' | 'segments' | 'anomaly' | 'inventory' | 'seo' | 'responses'>('stats')
+  const [activeTab, setActiveTab] = useState<'stats' | 'insights' | 'marketing' | 'analyzer' | 'forecast' | 'segments' | 'anomaly' | 'inventory' | 'seo' | 'responses' | 'pricing' | 'content' | 'churn' | 'bundles'>('stats')
 
   useEffect(() => {
     fetchStats()
@@ -57,72 +88,102 @@ export default function AIDashboard() {
     }
   }
 
-  // Mock data for demo
+  // Mock data for demo (only used when no real data)
   const mockStats: ChatStats = {
-    totalConversations: 1247,
-    totalMessages: 8932,
-    avgMessagesPerConversation: 7.2,
+    totalConversations: 0,
+    totalMessages: 0,
+    avgMessagesPerConversation: 0,
     topQueries: [
-      { query: 'telefon', count: 342 },
-      { query: 'laptop', count: 256 },
-      { query: 'szállítás', count: 189 },
-      { query: 'rendelés', count: 156 },
-      { query: 'gaming', count: 134 }
+      { query: 'Még nincs adat', count: 0 }
     ],
-    productSearches: 2341,
-    orderLookups: 567,
-    cartAdditions: 423,
-    conversionRate: 18.2
+    productSearches: 0,
+    orderLookups: 0,
+    cartAdditions: 0,
+    conversionRate: 0,
+    changes: {
+      conversations: '0%',
+      messages: '0%',
+      productSearches: '0%',
+      cartAdditions: '0%',
+      orderLookups: '0%',
+      conversionRate: '0%'
+    },
+    aiPerformance: {
+      avgResponseTime: 0,
+      avgResponseTimeChange: '0s',
+      avgResponseTimePositive: true,
+      successRate: 0,
+      successRateChange: '0%',
+      successRatePositive: true,
+      toolCalls: 0,
+      toolCallsChange: '0%',
+      toolCallsPositive: true
+    },
+    modelInfo: {
+      chatbotModel: 'gpt-4o-mini',
+      contentModel: 'gpt-4o',
+      maxTokens: 1500,
+      temperature: 0.7,
+      activeTools: 12,
+      status: 'active'
+    }
   }
 
   const displayStats = stats || mockStats
+  const changes = displayStats.changes || mockStats.changes!
+  const aiPerformance = displayStats.aiPerformance || mockStats.aiPerformance!
+  const modelInfo = displayStats.modelInfo || mockStats.modelInfo!
+
+  const isPositiveChange = (changeStr: string): boolean => {
+    return changeStr.startsWith('+') || changeStr === '0%'
+  }
 
   const statCards = [
     {
       title: 'Beszélgetések',
       value: displayStats.totalConversations.toLocaleString('hu-HU'),
-      change: '+12%',
-      positive: true,
+      change: changes.conversations,
+      positive: isPositiveChange(changes.conversations),
       icon: MessageSquare,
       color: 'purple'
     },
     {
       title: 'Üzenetek',
       value: displayStats.totalMessages.toLocaleString('hu-HU'),
-      change: '+8%',
-      positive: true,
+      change: changes.messages,
+      positive: isPositiveChange(changes.messages),
       icon: Bot,
       color: 'blue'
     },
     {
       title: 'Termékkeresések',
       value: displayStats.productSearches.toLocaleString('hu-HU'),
-      change: '+24%',
-      positive: true,
+      change: changes.productSearches,
+      positive: isPositiveChange(changes.productSearches),
       icon: Search,
       color: 'green'
     },
     {
       title: 'Kosárba helyezés',
       value: displayStats.cartAdditions.toLocaleString('hu-HU'),
-      change: '+15%',
-      positive: true,
+      change: changes.cartAdditions,
+      positive: isPositiveChange(changes.cartAdditions),
       icon: ShoppingCart,
       color: 'orange'
     },
     {
       title: 'Rendelés követés',
       value: displayStats.orderLookups.toLocaleString('hu-HU'),
-      change: '-3%',
-      positive: false,
+      change: changes.orderLookups,
+      positive: isPositiveChange(changes.orderLookups),
       icon: Package,
       color: 'pink'
     },
     {
       title: 'Konverzió',
       value: `${displayStats.conversionRate}%`,
-      change: '+2.3%',
-      positive: true,
+      change: changes.conversionRate,
+      positive: isPositiveChange(changes.conversionRate),
       icon: TrendingUp,
       color: 'cyan'
     }
@@ -279,6 +340,50 @@ export default function AIDashboard() {
           <BarChart3 size={16} />
           Termék Elemző
         </button>
+        <button
+          onClick={() => setActiveTab('pricing')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'pricing'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <DollarSign size={16} />
+          Ároptimalizáló
+        </button>
+        <button
+          onClick={() => setActiveTab('content')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'content'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <FileText size={16} />
+          Content Studio
+        </button>
+        <button
+          onClick={() => setActiveTab('churn')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'churn'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <UserX size={16} />
+          Churn Előrejelzés
+        </button>
+        <button
+          onClick={() => setActiveTab('bundles')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'bundles'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Gift size={16} />
+          Smart Bundler
+        </button>
       </div>
 
       {activeTab === 'insights' ? (
@@ -299,6 +404,14 @@ export default function AIDashboard() {
         <AISEOPanel />
       ) : activeTab === 'responses' ? (
         <AICustomerResponsePanel />
+      ) : activeTab === 'pricing' ? (
+        <AIPriceOptimizer />
+      ) : activeTab === 'content' ? (
+        <AIContentStudio />
+      ) : activeTab === 'churn' ? (
+        <AIChurnPrediction />
+      ) : activeTab === 'bundles' ? (
+        <AISmartBundler />
       ) : (
         <>
           {/* Stats Grid */}
@@ -369,23 +482,29 @@ export default function AIDashboard() {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white/5 rounded-lg p-4">
               <p className="text-gray-400 text-xs mb-1">Átlagos válaszidő</p>
-              <p className="text-xl font-bold text-white">1.2s</p>
-              <p className="text-green-400 text-xs mt-1">-0.3s a múlt héthez képest</p>
+              <p className="text-xl font-bold text-white">{aiPerformance.avgResponseTime.toFixed(1)}s</p>
+              <p className={`text-xs mt-1 ${aiPerformance.avgResponseTimePositive ? 'text-green-400' : 'text-red-400'}`}>
+                {aiPerformance.avgResponseTimeChange} az előző időszakhoz képest
+              </p>
             </div>
             <div className="bg-white/5 rounded-lg p-4">
               <p className="text-gray-400 text-xs mb-1">Sikeres keresések</p>
-              <p className="text-xl font-bold text-white">94.2%</p>
-              <p className="text-green-400 text-xs mt-1">+2.1% a múlt héthez képest</p>
+              <p className="text-xl font-bold text-white">{aiPerformance.successRate}%</p>
+              <p className={`text-xs mt-1 ${aiPerformance.successRatePositive ? 'text-green-400' : 'text-red-400'}`}>
+                {aiPerformance.successRateChange} az előző időszakhoz képest
+              </p>
             </div>
             <div className="bg-white/5 rounded-lg p-4">
               <p className="text-gray-400 text-xs mb-1">Átl. üzenet/beszélgetés</p>
               <p className="text-xl font-bold text-white">{displayStats.avgMessagesPerConversation.toFixed(1)}</p>
-              <p className="text-blue-400 text-xs mt-1">Stabil</p>
+              <p className="text-blue-400 text-xs mt-1">Átlagos aktivitás</p>
             </div>
             <div className="bg-white/5 rounded-lg p-4">
               <p className="text-gray-400 text-xs mb-1">Tool hívások</p>
-              <p className="text-xl font-bold text-white">3,421</p>
-              <p className="text-green-400 text-xs mt-1">+18% a múlt héthez képest</p>
+              <p className="text-xl font-bold text-white">{aiPerformance.toolCalls.toLocaleString('hu-HU')}</p>
+              <p className={`text-xs mt-1 ${aiPerformance.toolCallsPositive ? 'text-green-400' : 'text-red-400'}`}>
+                {aiPerformance.toolCallsChange} az előző időszakhoz képest
+              </p>
             </div>
           </div>
         </div>
@@ -402,29 +521,37 @@ export default function AIDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mt-4">
               <div>
                 <p className="text-gray-400 text-xs">Chatbot Model</p>
-                <p className="text-white font-semibold">GPT-5 Mini</p>
+                <p className="text-white font-semibold">{modelInfo.chatbotModel}</p>
               </div>
               <div>
                 <p className="text-gray-400 text-xs">Content Model</p>
-                <p className="text-white font-semibold">GPT-5.2</p>
+                <p className="text-white font-semibold">{modelInfo.contentModel}</p>
               </div>
               <div>
                 <p className="text-gray-400 text-xs">Max Tokens</p>
-                <p className="text-white font-semibold">1,500</p>
+                <p className="text-white font-semibold">{modelInfo.maxTokens.toLocaleString('hu-HU')}</p>
               </div>
               <div>
                 <p className="text-gray-400 text-xs">Temperature</p>
-                <p className="text-white font-semibold">0.7</p>
+                <p className="text-white font-semibold">{modelInfo.temperature}</p>
               </div>
               <div>
                 <p className="text-gray-400 text-xs">Aktív Tools</p>
-                <p className="text-white font-semibold">12 db</p>
+                <p className="text-white font-semibold">{modelInfo.activeTools} db</p>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 rounded-full">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-green-400 text-sm font-medium">Aktív</span>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
+            modelInfo.status === 'active' ? 'bg-green-500/20' : 'bg-red-500/20'
+          }`}>
+            <span className={`w-2 h-2 rounded-full animate-pulse ${
+              modelInfo.status === 'active' ? 'bg-green-500' : 'bg-red-500'
+            }`} />
+            <span className={`text-sm font-medium ${
+              modelInfo.status === 'active' ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {modelInfo.status === 'active' ? 'Aktív' : 'Inaktív'}
+            </span>
           </div>
         </div>
         

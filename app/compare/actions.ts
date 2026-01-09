@@ -7,6 +7,7 @@ export type CompareProduct = {
   name: string
   description: string
   price: number
+  originalPrice: number | null
   image: string
   stock: number
   rating: number
@@ -59,7 +60,8 @@ export async function getCompareProducts(ids: number[]): Promise<CompareProduct[
       id: p.id,
       name: p.name,
       description: p.description,
-      price: p.price,
+      price: p.salePrice ?? p.price, // Use sale price if available
+      originalPrice: p.salePrice ? p.price : null, // Original price only if on sale
       image: p.image,
       stock: p.stock,
       rating: p.rating,

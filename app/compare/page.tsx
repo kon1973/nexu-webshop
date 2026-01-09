@@ -9,7 +9,7 @@ import { Trash2, ShoppingCart, X, ArrowLeft, Check, Package, Star, Plus, Loader2
 import { motion, AnimatePresence } from 'framer-motion'
 import { getImageUrl } from '@/lib/image'
 import { getCompareProducts, getSimilarProducts, type CompareProduct } from './actions'
-import AICompare from '@/app/components/AICompare'
+import AICompareAdvanced from '@/app/components/AICompareAdvanced'
 
 type SimilarProduct = {
   id: number
@@ -173,16 +173,18 @@ export default function ComparePage() {
             className="mb-8 overflow-hidden"
           >
             <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/20 rounded-2xl p-6">
-              <AICompare 
+              <AICompareAdvanced 
                 products={products.map(p => ({
                   id: p.id,
                   name: p.name,
                   slug: String(p.id),
                   price: p.price,
+                  originalPrice: p.originalPrice,
                   image: p.image,
                   category: p.category,
-                  brand: p.brand ? { name: p.brand } : null,
-                  description: null
+                  brand: p.brand,
+                  rating: p.rating,
+                  stock: p.stock
                 }))}
                 onRemove={removeFromCompare}
               />
