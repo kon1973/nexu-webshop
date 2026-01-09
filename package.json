@@ -12,17 +12,15 @@
     "test:e2e": "playwright test",
     "postinstall": "prisma generate",
     "seed": "tsx prisma/seed.ts",
-    "seed:ratelimits": "tsx scripts/seed-rate-limits.ts"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed:ratelimits": "tsx scripts/seed-rate-limits.ts",
+    "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.7",
     "@ai-sdk/react": "^3.0.23",
     "@auth/prisma-adapter": "^2.11.1",
-    "@prisma/adapter-pg": "^5.22.0",
-    "@prisma/client": "^5.22.0",
+    "@prisma/adapter-pg": "^6.19.1",
+    "@prisma/client": "^6.19.1",
     "@sentry/nextjs": "^10.32.1",
     "@stripe/react-stripe-js": "^5.4.1",
     "@stripe/stripe-js": "^8.6.0",
@@ -44,6 +42,7 @@
     "next-auth": "^5.0.0-beta.30",
     "openai": "^6.15.0",
     "pg": "^8.16.3",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.6.0",
@@ -70,9 +69,9 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.0",
     "jsdom": "^27.4.0",
-    "jspdf": "^3.0.4",
-    "jspdf-autotable": "^5.0.2",
-    "prisma": "^5.22.0",
+    "jspdf": "^4.0.0",
+    "jspdf-autotable": "^5.0.7",
+    "prisma": "^6.19.1",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",

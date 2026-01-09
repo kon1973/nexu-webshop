@@ -2746,3 +2746,536 @@ Elemezd ezeket és adj stratégiai javaslatokat!`
     return { error: 'Failed to detect trends' }
   }
 }
+
+// ============================================================================
+// AI RETURN PREDICTOR
+// ============================================================================
+
+export async function predictReturns(timeRange: '7d' | '30d' | '90d' = '30d') {
+  try {
+    const session = await auth()
+    if (!session?.user || session.user.role !== 'admin') {
+      return { error: 'Unauthorized' }
+    }
+
+    const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+
+    // Get recent orders and products
+    const recentOrders = await prisma.order.findMany({
+      where: {
+        createdAt: { gte: startDate }
+      },
+      include: {
+        items: {
+          include: { product: true }
+        }
+      },
+      take: 200
+    })
+
+    // Get products with reviews (low ratings indicate return risk)
+    const productsWithReviews = await prisma.product.findMany({
+      where: {
+        isArchived: false
+      },
+      include: {
+        reviews: {
+          where: { createdAt: { gte: startDate } },
+          select: { rating: true, text: true }
+        },
+        orderItems: {
+          where: { order: { createdAt: { gte: startDate } } }
+        }
+      },
+      take: 50
+    })
+
+    // Calculate metrics per product
+    const productMetrics = productsWithReviews.map(product => {
+      const avgRating = product.reviews.length > 0
+        ? product.reviews.reduce((sum, r) => sum + r.rating, 0) / product.reviews.length
+        : 5
+      const orderCount = product.orderItems.length
+      const negativeReviews = product.reviews.filter(r => r.rating <= 2).length
+      
+      return {
+        id: product.id,
+        name: product.name,
+        avgRating,
+        orderCount,
+        negativeReviews,
+        price: product.salePrice || product.price
+      }
+    })
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy visszáru előrejelző AI vagy e-commerce-hez. Elemezd a termékadatokat és becsüld meg a visszáru kockázatokat.
+
+Válaszolj CSAK JSON formátumban:
+{
+  "predictions": [
+    {
+      "productId": number,
+      "returnProbability": number (0-100),
+      "riskLevel": "high|medium|low",
+      "reasons": ["string array - max 3 ok"],
+      "preventionActions": ["string array - max 2 javaslat"],
+      "estimatedLoss": number
+    }
+  ],
+  "generalInsights": ["string array - 3-5 általános meglátás"],
+  "highRiskFactors": ["string array - fő kockázati tényezők"]
+}`
+        },
+        {
+          role: 'user',
+          content: `Termék metrikák (utolsó ${days} nap):
+${productMetrics.slice(0, 30).map(p => 
+  `- ${p.name}: Átlag értékelés: ${p.avgRating.toFixed(1)}, Rendelések: ${p.orderCount}, Negatív értékelés: ${p.negativeReviews}, Ár: ${p.price} Ft`
+).join('\n')}
+
+Elemezd és készíts visszáru előrejelzést!`
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 1200
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    // Enrich predictions with product names
+    const predictions = (aiResult.predictions || []).map((pred: {
+      productId: number
+      returnProbability: number
+      riskLevel: string
+      reasons: string[]
+      preventionActions: string[]
+      estimatedLoss: number
+    }) => {
+      const product = productMetrics.find(p => p.id === pred.productId)
+      return {
+        productId: pred.productId,
+        productName: product?.name || `Termék #${pred.productId}`,
+        returnProbability: pred.returnProbability,
+        riskLevel: pred.riskLevel,
+        reasons: pred.reasons || [],
+        preventionActions: pred.preventionActions || [],
+        estimatedLoss: pred.estimatedLoss || 0
+      }
+    })
+
+    const highRisk = predictions.filter((p: { riskLevel: string }) => p.riskLevel === 'high').length
+    const mediumRisk = predictions.filter((p: { riskLevel: string }) => p.riskLevel === 'medium').length
+    const lowRisk = predictions.filter((p: { riskLevel: string }) => p.riskLevel === 'low').length
+    const potentialLosses = predictions.reduce((sum: number, p: { estimatedLoss: number }) => sum + p.estimatedLoss, 0)
+
+    return {
+      success: true,
+      analysis: {
+        totalRiskProducts: predictions.length,
+        highRiskCount: highRisk,
+        mediumRiskCount: mediumRisk,
+        lowRiskCount: lowRisk,
+        potentialLosses,
+        predictions,
+        generalInsights: aiResult.generalInsights || [],
+        seasonalTrends: [] // Could be populated from historical data
+      }
+    }
+  } catch (error) {
+    console.error('Return prediction error:', error)
+    return { success: false, error: 'Hiba az előrejelzés során' }
+  }
+}
+
+// ============================================================================
+// AI AUTO TAGGING
+// ============================================================================
+
+export async function autoTagProducts(mode: 'untagged' | 'all' = 'untagged') {
+  try {
+    const session = await auth()
+    if (!session?.user || session.user.role !== 'admin') {
+      return { error: 'Unauthorized' }
+    }
+
+    // Get products to tag
+    const products = await prisma.product.findMany({
+      where: {
+        isArchived: false,
+        ...(mode === 'untagged' ? { tags: { equals: [] } } : {})
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        category: true,
+        image: true,
+        tags: true,
+        price: true
+      },
+      take: 30
+    })
+
+    if (products.length === 0) {
+      return {
+        success: true,
+        result: {
+          totalProcessed: 0,
+          newTagsAdded: 0,
+          categorySuggestions: 0,
+          products: []
+        }
+      }
+    }
+
+    // Get available categories for suggestions
+    const categories = await prisma.category.findMany({
+      select: { name: true }
+    })
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy termék címkéző AI vagy. Elemezd a termékeket és javasolj releváns címkéket.
+
+Elérhető kategóriák: ${categories.map(c => c.name).join(', ')}
+
+Válaszolj CSAK JSON formátumban:
+{
+  "products": [
+    {
+      "productId": number,
+      "suggestedTags": ["string array - 3-5 releváns címke magyarul"],
+      "suggestedCategory": "string or null - ha más kategória lenne jobb",
+      "confidence": number (60-100),
+      "reasoning": "string - rövid indoklás magyarul"
+    }
+  ]
+}`
+        },
+        {
+          role: 'user',
+          content: `Termékek címkézésre:
+${products.map(p => `ID: ${p.id}
+Név: ${p.name}
+Kategória: ${p.category}
+Leírás: ${(p.description || '').slice(0, 200)}
+Jelenlegi címkék: ${Array.isArray(p.tags) && p.tags.length > 0 ? p.tags.join(', ') : 'nincs'}
+---`).join('\n')}
+
+Javasolj címkéket és ha szükséges, kategória módosítást!`
+        }
+      ],
+      temperature: 0.4,
+      max_tokens: 1500
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    // Merge with product data
+    const taggedProducts = (aiResult.products || []).map((tagged: {
+      productId: number
+      suggestedTags: string[]
+      suggestedCategory?: string
+      confidence: number
+      reasoning: string
+    }) => {
+      const product = products.find(p => p.id === tagged.productId)
+      if (!product) return null
+      
+      return {
+        productId: product.id,
+        productName: product.name,
+        image: product.image,
+        currentTags: Array.isArray(product.tags) ? product.tags : [],
+        suggestedTags: tagged.suggestedTags || [],
+        suggestedCategory: tagged.suggestedCategory,
+        confidence: tagged.confidence || 70,
+        reasoning: tagged.reasoning || ''
+      }
+    }).filter(Boolean)
+
+    const newTagsCount = taggedProducts.reduce((sum: number, p: { suggestedTags: string[] }) => sum + p.suggestedTags.length, 0)
+    const categorySuggestionsCount = taggedProducts.filter((p: { suggestedCategory?: string }) => p.suggestedCategory).length
+
+    return {
+      success: true,
+      result: {
+        totalProcessed: taggedProducts.length,
+        newTagsAdded: newTagsCount,
+        categorySuggestions: categorySuggestionsCount,
+        products: taggedProducts
+      }
+    }
+  } catch (error) {
+    console.error('Auto tagging error:', error)
+    return { success: false, error: 'Hiba az automatikus címkézés során' }
+  }
+}
+
+export async function suggestCategoriesForProduct(productId: number) {
+  try {
+    const session = await auth()
+    if (!session?.user || session.user.role !== 'admin') {
+      return { error: 'Unauthorized' }
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        name: true,
+        description: true,
+        category: true,
+        tags: true
+      }
+    })
+
+    if (!product) {
+      return { error: 'Product not found' }
+    }
+
+    const categories = await prisma.category.findMany({
+      select: { id: true, name: true, slug: true }
+    })
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Javasolj kategóriákat egy termékhez. Válaszolj JSON-ban:
+{ "suggestions": [{ "categoryName": "string", "confidence": number, "reason": "string" }] }`
+        },
+        {
+          role: 'user',
+          content: `Termék: ${product.name}
+Jelenlegi kategória: ${product.category}
+Leírás: ${product.description || 'nincs'}
+Elérhető kategóriák: ${categories.map(c => c.name).join(', ')}
+
+Javasolj megfelelő kategóriákat!`
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 400
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const result = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    return {
+      success: true,
+      suggestions: result.suggestions || []
+    }
+  } catch (error) {
+    console.error('Category suggestion error:', error)
+    return { success: false, error: 'Hiba a kategória javaslatok során' }
+  }
+}
+
+// ============================================================================
+// AI INVENTORY PREDICTOR
+// ============================================================================
+
+export async function predictInventory(timeframe: '7d' | '30d' | '90d' = '30d') {
+  try {
+    const session = await auth()
+    if (!session?.user || session.user.role !== 'admin') {
+      return { error: 'Unauthorized' }
+    }
+
+    // Calculate date range
+    const days = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+
+    // Get products with recent order data
+    const products = await prisma.product.findMany({
+      where: {
+        isArchived: false
+      },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        stock: true,
+        category: true,
+        price: true,
+        orderItems: {
+          where: {
+            order: {
+              createdAt: { gte: startDate }
+            }
+          },
+          select: {
+            quantity: true,
+            order: {
+              select: { createdAt: true }
+            }
+          }
+        }
+      },
+      take: 100
+    })
+
+    // Calculate sales data per product
+    const productSalesData = products.map(product => {
+      const totalSold = product.orderItems.reduce((sum, item) => sum + item.quantity, 0)
+      const avgDailySales = totalSold / days
+      
+      return {
+        id: product.id,
+        name: product.name,
+        image: product.image,
+        stock: product.stock,
+        category: product.category,
+        price: product.price,
+        totalSold,
+        avgDailySales,
+        orderCount: product.orderItems.length
+      }
+    })
+
+    // Get categories for seasonal analysis
+    const categories = await prisma.category.findMany({
+      select: { name: true }
+    })
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy készlet előrejelző AI vagy egy tech webshopban. A korábbi eladási adatok és trendek alapján jósold meg a jövőbeli keresletet.
+
+Elemezz mindent:
+- Szezonális trendek (pl. Black Friday, karácsony, iskolakezdés)
+- Tech piac trendek
+- Készletszintek és újrarendelési pontok
+
+Válaszolj CSAK JSON formátumban:
+{
+  "predictions": [
+    {
+      "productId": number,
+      "predictedDemand": number (becsült darabszám a következő ${days} napra),
+      "daysUntilStockout": number or null (ha elfogyhat),
+      "recommendedReorder": number (javasolt rendelési mennyiség),
+      "trend": "increasing" | "stable" | "decreasing",
+      "confidence": number (60-100),
+      "seasonalFactor": "string or null - szezonális tényező ha van"
+    }
+  ],
+  "insights": ["string array - fontos meglátások magyarul"],
+  "seasonalTrends": [
+    {
+      "category": "string",
+      "trend": "string - trend leírás",
+      "recommendation": "string - ajánlás"
+    }
+  ]
+}`
+        },
+        {
+          role: 'user',
+          content: `Időszak: elmúlt ${days} nap adatai
+Jelenlegi dátum: ${new Date().toLocaleDateString('hu-HU')}
+
+Termékek eladási adatai:
+${productSalesData.filter(p => p.orderCount > 0 || p.stock < 20).map(p => 
+  `ID: ${p.id}, ${p.name}, Kategória: ${p.category}, Készlet: ${p.stock} db, Eladva: ${p.totalSold} db, Átlag napi: ${p.avgDailySales.toFixed(1)}`
+).join('\n')}
+
+Kategóriák: ${categories.map(c => c.name).join(', ')}
+
+Készíts előrejelzést a készletekről!`
+        }
+      ],
+      temperature: 0.4,
+      max_tokens: 2000
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    // Merge predictions with product data
+    const predictions = (aiResult.predictions || []).map((pred: {
+      productId: number
+      predictedDemand: number
+      daysUntilStockout: number | null
+      recommendedReorder: number
+      trend: 'increasing' | 'stable' | 'decreasing'
+      confidence: number
+      seasonalFactor?: string
+    }) => {
+      const product = productSalesData.find(p => p.id === pred.productId)
+      if (!product) return null
+      
+      return {
+        productId: product.id,
+        productName: product.name,
+        image: product.image,
+        currentStock: product.stock,
+        predictedDemand: pred.predictedDemand,
+        daysUntilStockout: pred.daysUntilStockout,
+        recommendedReorder: pred.recommendedReorder,
+        trend: pred.trend,
+        confidence: pred.confidence,
+        seasonalFactor: pred.seasonalFactor
+      }
+    }).filter(Boolean)
+
+    // Calculate summary stats
+    const criticalItems = predictions.filter((p: { daysUntilStockout: number | null }) => 
+      p.daysUntilStockout !== null && p.daysUntilStockout <= 7
+    ).length
+    
+    const lowStockItems = predictions.filter((p: { daysUntilStockout: number | null }) => 
+      p.daysUntilStockout !== null && p.daysUntilStockout > 7 && p.daysUntilStockout <= 14
+    ).length
+    
+    const overstockItems = predictions.filter((p: { currentStock: number; predictedDemand: number }) => 
+      p.currentStock > p.predictedDemand * 3
+    ).length
+
+    const totalReorderValue = predictions.reduce((sum: number, p: { recommendedReorder: number; productId: number }) => {
+      const product = productSalesData.find(pr => pr.id === p.productId)
+      return sum + (p.recommendedReorder * (product?.price || 0))
+    }, 0)
+
+    return {
+      success: true,
+      result: {
+        predictions,
+        criticalItems,
+        lowStockItems,
+        overstockItems,
+        totalReorderValue,
+        insights: aiResult.insights || [],
+        seasonalTrends: aiResult.seasonalTrends || []
+      }
+    }
+  } catch (error) {
+    console.error('Inventory prediction error:', error)
+    return { success: false, error: 'Hiba a készlet előrejelzés során' }
+  }
+}

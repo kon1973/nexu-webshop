@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { getImageUrl } from '@/lib/image'
 import { getCompareProducts, getSimilarProducts, type CompareProduct } from './actions'
 import AICompareAdvanced from '@/app/components/AICompareAdvanced'
+import CompareExport from '@/app/components/CompareExport'
 
 type SimilarProduct = {
   id: number
@@ -132,7 +133,7 @@ export default function ComparePage() {
           <h1 className="text-3xl font-bold text-white">Termék összehasonlítás</h1>
           <p className="text-gray-400 mt-1">{products.length} termék összehasonlítása</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {products.length >= 2 && (
             <button
               onClick={() => setShowAICompare(!showAICompare)}
@@ -145,6 +146,9 @@ export default function ComparePage() {
               <Sparkles size={18} />
               AI Elemzés
             </button>
+          )}
+          {products.length > 0 && (
+            <CompareExport products={products} />
           )}
           <Link
             href="/shop"

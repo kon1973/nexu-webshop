@@ -3,7 +3,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -110,6 +109,7 @@ model Product {
   category    String
   image       String
   images      String[] @default([])
+  tags        String[] @default([])  // AI-generated product tags
   rating      Float    @default(0)
   fullDescription String?
   specifications Json?
@@ -463,4 +463,26 @@ model ChatMessage {
   @@index([sessionId])
   @@index([createdAt])
   @@index([intent])
+}
+
+// Price Alert for price drop notifications
+model PriceAlert {
+  id          String    @id @default(cuid())
+  email       String
+  productId   Int
+  productName String    // Denormalized for faster lookups
+  productImage String?
+  currentPrice Int      // Price when alert was set
+  targetPrice Int       // Desired price threshold
+  triggered   Boolean   @default(false)
+  triggeredAt DateTime?
+  notifiedAt  DateTime? // When email was sent
+  userId      String?   // Optional - logged in user
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([email, productId])
+  @@index([productId])
+  @@index([triggered])
+  @@index([email])
 }

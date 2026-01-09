@@ -15,6 +15,7 @@ import { validateCoupon } from '@/app/cart/actions'
 import { createOrder, getUserAddresses, getUserLoyalty, validateCart, getDeliveryEstimate } from './actions'
 import CheckoutForm from './CheckoutForm'
 import { getImageUrl } from '@/lib/image'
+import CheckoutProgress from '@/app/components/CheckoutProgress'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -410,26 +411,9 @@ export default function CheckoutPage() {
         </AnimatePresence>
 
         {/* Mobile Progress Stepper */}
-        <div className="flex items-center justify-center mb-8 md:mb-12">
-          <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-base w-full max-w-md justify-between px-4 sm:px-0">
-            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-green-500 font-bold">
-              <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-green-500/20 flex items-center justify-center border-2 sm:border border-green-500/50 sm:border-green-500/30 text-sm sm:text-base">✓</div>
-              <span className="text-[10px] sm:text-base">Kosár</span>
-            </div>
-            <div className="flex-1 h-0.5 bg-green-500/30 mx-1 sm:mx-0 sm:w-8 sm:flex-none" />
-            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-blue-400 font-bold">
-              <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-blue-500/20 flex items-center justify-center border-2 sm:border border-blue-500/50 sm:border-blue-500/30 text-sm sm:text-base">2</div>
-              <span className="text-[10px] sm:text-base">Adatok</span>
-            </div>
-            <div className="flex-1 h-0.5 bg-white/10 mx-1 sm:mx-0 sm:w-8 sm:flex-none" />
-            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-gray-500 font-bold">
-              <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center border-2 sm:border border-white/20 sm:border-white/10 text-sm sm:text-base">3</div>
-              <span className="text-[10px] sm:text-base">Kész</span>
-            </div>
-          </div>
-        </div>
+        <CheckoutProgress currentStep={2} completedSteps={[1]} />
 
-        <Link href="/cart" className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition">
+        <Link href="/cart" className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 mt-8 transition">
           <ArrowLeft size={20} /> Vissza a kosárhoz
         </Link>
 

@@ -13,6 +13,7 @@ import { validateCoupon } from './actions'
 import { getCartRecommendations, getUserLoyaltyInfo, checkStockAvailability } from './cart-actions'
 import { getImageUrl } from '@/lib/image'
 import AISmartCartUpsell from '@/app/components/AISmartCartUpsell'
+import CartShareSave from '@/app/components/CartShareSave'
 
 type RecommendedProduct = {
   id: number
@@ -537,6 +538,9 @@ export default function CartPage() {
                   Még válogatok
                 </Link>
               </div>
+
+              {/* Cart Share & Save */}
+              <CartShareSave />
             </div>
           </div>
         </div>

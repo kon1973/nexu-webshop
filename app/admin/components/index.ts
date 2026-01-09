@@ -49,3 +49,8 @@ export {
   SettingsActions,
   SettingsSlider
 } from './SettingsPanel'
+
+// AI Components
+export { default as AIReturnPredictor } from './AIReturnPredictor'
+export { default as AIAutoTagging } from './AIAutoTagging'
+export { default as AIInventoryPredictor } from './AIInventoryPredictor'

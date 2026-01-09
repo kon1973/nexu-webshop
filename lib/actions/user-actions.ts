@@ -2420,3 +2420,985 @@ export async function subscribeToDeals(productId: number) {
     return { success: false, error: 'Hiba a feliratkozáskor' }
   }
 }
+
+// ============================================================================
+// AI VOICE SEARCH
+// ============================================================================
+
+export async function processVoiceSearch(query: string) {
+  try {
+    // Get all products for context
+    const products = await prisma.product.findMany({
+      where: { 
+        isArchived: false,
+        stock: { gt: 0 }
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        salePrice: true,
+        image: true,
+        category: true,
+        description: true
+      },
+      take: 100
+    })
+
+    // Use AI to interpret the voice query
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy e-commerce keresési asszisztens vagy. A felhasználó hangalapú keresést végzett. 
+Értelmezd a magyar nyelvű keresést és válassz releváns termékeket.
+
+Válaszolj CSAK JSON formátumban:
+{
+  "interpretation": "string - mit értettél a keresésből magyarul, barátságosan",
+  "productIds": [number array - releváns termék ID-k, max 6],
+  "relevanceScores": [number array - 1-100 közötti relevancia pontszámok],
+  "filters": {
+    "category": "string or null",
+    "minPrice": number or null,
+    "maxPrice": number or null,
+    "inStock": boolean or null
+  },
+  "suggestions": ["string array - 3 javasolt keresés hasonló témában"]
+}`
+        },
+        {
+          role: 'user',
+          content: `Keresés: "${query}"
+
+Elérhető termékek:
+${products.map(p => `ID: ${p.id}, Név: ${p.name}, Kategória: ${p.category}, Ár: ${p.salePrice || p.price} Ft`).join('\n')}`
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 800
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    // Build results
+    const results = (aiResult.productIds || []).map((id: number, idx: number) => {
+      const product = products.find(p => p.id === id)
+      if (!product) return null
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        price: product.salePrice || product.price,
+        image: product.image,
+        category: product.category,
+        relevanceScore: aiResult.relevanceScores?.[idx] || 80
+      }
+    }).filter(Boolean)
+
+    return {
+      success: true,
+      result: {
+        query,
+        interpretation: aiResult.interpretation || `Keresés: "${query}"`,
+        results,
+        suggestions: aiResult.suggestions || [],
+        filters: aiResult.filters
+      }
+    }
+  } catch (error) {
+    console.error('Voice search error:', error)
+    return { success: false, error: 'Hiba a hangkeresés feldolgozásakor' }
+  }
+}
+
+// ============================================================================
+// AI BUDGET PLANNER
+// ============================================================================
+
+interface BudgetPlanItem {
+  id: string
+  name: string
+  productId?: number
+  price: number
+  priority: 'must-have' | 'nice-to-have' | 'optional'
+  category?: string
+}
+
+export async function analyzeBudgetPlan(data: {
+  budget: number
+  items: BudgetPlanItem[]
+}) {
+  try {
+    const { budget, items } = data
+    
+    // Calculate totals
+    const totalCost = items.reduce((sum, item) => sum + item.price, 0)
+    const mustHaveTotal = items.filter(i => i.priority === 'must-have').reduce((sum, i) => sum + i.price, 0)
+    const niceToHaveTotal = items.filter(i => i.priority === 'nice-to-have').reduce((sum, i) => sum + i.price, 0)
+    const optionalTotal = items.filter(i => i.priority === 'optional').reduce((sum, i) => sum + i.price, 0)
+
+    // Find cheaper alternatives for over-budget items
+    const productIds = items.filter(i => i.productId).map(i => i.productId!)
+    const alternatives = await prisma.product.findMany({
+      where: {
+        isArchived: false,
+        stock: { gt: 0 },
+        id: { notIn: productIds },
+        OR: items.map(i => ({
+          category: i.category,
+          price: { lt: i.price }
+        }))
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        salePrice: true,
+        image: true,
+        category: true
+      },
+      take: 20
+    })
+
+    // Build AI prompt
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy pénzügyi tanácsadó AI vagy vásárláshoz. Elemezd a költségvetést és adj javaslatokat.
+
+Válaszolj CSAK JSON formátumban:
+{
+  "aiAdvice": "string - általános tanács magyarul, max 2 mondat",
+  "recommendations": [
+    {
+      "type": "swap|remove|add|wait",
+      "itemId": "string or null - melyik elemre vonatkozik",
+      "suggestion": "string - javaslat leírása",
+      "potentialSavings": number or null,
+      "alternativeProductId": number or null
+    }
+  ],
+  "savingsTips": ["string array - 3 spórolási tipp"]
+}`
+        },
+        {
+          role: 'user',
+          content: `Költségkeret: ${budget.toLocaleString('hu-HU')} Ft
+Tervezett költés: ${totalCost.toLocaleString('hu-HU')} Ft
+${totalCost > budget ? `TÚLLÉPÉS: ${(totalCost - budget).toLocaleString('hu-HU')} Ft` : `Maradék: ${(budget - totalCost).toLocaleString('hu-HU')} Ft`}
+
+Tervezett vásárlások:
+${items.map(i => `- ${i.name}: ${i.price.toLocaleString('hu-HU')} Ft (${i.priority === 'must-have' ? 'Kötelező' : i.priority === 'nice-to-have' ? 'Jó lenne' : 'Opcionális'})`).join('\n')}
+
+Olcsóbb alternatívák:
+${alternatives.slice(0, 10).map(a => `- ${a.name}: ${(a.salePrice || a.price).toLocaleString('hu-HU')} Ft (${a.category})`).join('\n')}
+
+Adj maximum 3 konkrét javaslatot a költségkeret tartásához!`
+        }
+      ],
+      temperature: 0.6,
+      max_tokens: 800
+    })
+
+    const content = response.choices[0]?.message?.content
+    let aiResult = { aiAdvice: '', recommendations: [], savingsTips: [] }
+    
+    if (content) {
+      try {
+        aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+      } catch {
+        // use defaults
+      }
+    }
+
+    // Enrich recommendations with product data
+    const enrichedRecs = (aiResult.recommendations || []).map((rec: { type: string; itemId?: string; suggestion: string; potentialSavings?: number; alternativeProductId?: number }) => {
+      const alt = rec.alternativeProductId 
+        ? alternatives.find(a => a.id === rec.alternativeProductId)
+        : null
+      
+      return {
+        type: rec.type,
+        itemId: rec.itemId,
+        suggestion: rec.suggestion,
+        potentialSavings: rec.potentialSavings,
+        alternativeProduct: alt ? {
+          id: alt.id,
+          name: alt.name,
+          price: alt.salePrice || alt.price,
+          slug: alt.slug,
+          image: alt.image
+        } : undefined
+      }
+    })
+
+    return {
+      success: true,
+      analysis: {
+        totalCost,
+        budgetStatus: totalCost < budget ? 'under' : totalCost > budget ? 'over' : 'exact',
+        savings: Math.max(0, budget - totalCost),
+        priorityBreakdown: {
+          mustHave: mustHaveTotal,
+          niceToHave: niceToHaveTotal,
+          optional: optionalTotal
+        },
+        recommendations: enrichedRecs,
+        aiAdvice: aiResult.aiAdvice || 'Elemezd a prioritásokat és fontold meg az opcionális tételek elhagyását.',
+        savingsTips: aiResult.savingsTips || []
+      }
+    }
+  } catch (error) {
+    console.error('Budget analysis error:', error)
+    return { success: false, error: 'Hiba a költségvetés elemzésekor' }
+  }
+}
+
+export async function getSmartBudgetSuggestions(budget: number) {
+  try {
+    // Get products within budget
+    const products = await prisma.product.findMany({
+      where: {
+        isArchived: false,
+        stock: { gt: 0 },
+        OR: [
+          { price: { lte: budget } },
+          { salePrice: { lte: budget } }
+        ]
+      },
+      include: { brand: true },
+      orderBy: [
+        { rating: 'desc' },
+        { salePrice: 'asc' }
+      ],
+      take: 30
+    })
+
+    // Use AI to create a smart shopping list
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy okos vásárlási tanácsadó AI vagy. Készíts egy optimális bevásárló listát a megadott költségkeretből.
+
+Válaszolj CSAK JSON formátumban:
+{
+  "suggestions": [
+    {
+      "productId": number,
+      "priority": "must-have|nice-to-have|optional",
+      "reason": "string - miért ajánlod"
+    }
+  ]
+}`
+        },
+        {
+          role: 'user',
+          content: `Költségkeret: ${budget.toLocaleString('hu-HU')} Ft
+
+Elérhető termékek:
+${products.slice(0, 20).map(p => `ID: ${p.id}, ${p.name}, ${(p.salePrice || p.price).toLocaleString('hu-HU')} Ft, ${p.category}, Értékelés: ${p.rating}`).join('\n')}
+
+Válassz ki 3-5 terméket, ami belefér a költségkeretbe és jó ár-érték arányt képvisel!`
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 600
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    // Enrich with product data
+    const suggestions = (aiResult.suggestions || []).map((s: { productId: number; priority: string; reason: string }) => {
+      const product = products.find(p => p.id === s.productId)
+      if (!product) return null
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        price: product.salePrice || product.price,
+        category: product.category,
+        image: product.image,
+        priority: s.priority,
+        reason: s.reason
+      }
+    }).filter(Boolean)
+
+    return { success: true, suggestions }
+  } catch (error) {
+    console.error('Smart suggestions error:', error)
+    return { success: false, error: 'Hiba a javaslatok generálásakor' }
+  }
+}
+
+// ============================================================================
+// AI STYLE ADVISOR
+// ============================================================================
+
+// ============================================================================
+// AI TECH ADVISOR
+// ============================================================================
+
+interface TechPreferences {
+  useCase: string
+  priority: string[]
+  budget: string
+  experienceLevel: string
+  ecosystem?: string
+}
+
+export async function getTechRecommendations(preferences: TechPreferences) {
+  try {
+    // Get products based on budget
+    const budgetRanges: Record<string, { min: number; max: number }> = {
+      'budget': { min: 0, max: 100000 },
+      'mid': { min: 100000, max: 300000 },
+      'premium': { min: 300000, max: 500000 },
+      'flagship': { min: 500000, max: 999999999 }
+    }
+    const range = budgetRanges[preferences.budget] || { min: 0, max: 999999999 }
+
+    // Map use cases to relevant categories
+    const useCaseCategories: Record<string, string[]> = {
+      'gaming': ['Laptopok', 'Monitorok', 'Gaming', 'Fejhallgatók', 'Billentyűzetek', 'Egerek'],
+      'office': ['Laptopok', 'Monitorok', 'Billentyűzetek', 'Webkamerák', 'Fejhallgatók'],
+      'content': ['Laptopok', 'Monitorok', 'Kamerák', 'Mikrofonok', 'Világítás'],
+      'music': ['Fejhallgatók', 'Hangszórók', 'Audio', 'Mikrofonok'],
+      'smarthome': ['Okosotthon', 'Hangszórók', 'Kamerák', 'Szenzorok'],
+      'mobile': ['Telefonok', 'Tabletek', 'Powerbankok', 'Fülhallgatók', 'Okosórák']
+    }
+
+    const relevantCategories = useCaseCategories[preferences.useCase] || []
+
+    const products = await prisma.product.findMany({
+      where: {
+        isArchived: false,
+        stock: { gt: 0 },
+        OR: [
+          { price: { gte: range.min, lte: range.max } },
+          { salePrice: { gte: range.min, lte: range.max } }
+        ],
+        ...(relevantCategories.length > 0 ? {
+          category: { in: relevantCategories }
+        } : {})
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        salePrice: true,
+        image: true,
+        category: true,
+        description: true,
+        specifications: true
+      },
+      take: 60
+    })
+
+    const useCaseLabels: Record<string, string> = {
+      'gaming': 'Gaming',
+      'office': 'Home Office',
+      'content': 'Tartalomgyártás',
+      'music': 'Zenei produkció',
+      'smarthome': 'Okosotthon',
+      'mobile': 'Mobilitás'
+    }
+
+    const priorityLabels: Record<string, string> = {
+      'performance': 'Teljesítmény',
+      'battery': 'Akkumulátor élettartam',
+      'connectivity': 'Vezetéknélküli kapcsolat',
+      'display': 'Kijelző minőség',
+      'portability': 'Hordozhatóság',
+      'value': 'Ár-érték arány'
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy tech tanácsadó AI vagy. A felhasználó igényei alapján adj személyre szabott tech eszköz ajánlásokat.
+
+Válaszolj CSAK JSON formátumban:
+{
+  "profile": "string - 2-3 mondatos tech profil leírás magyarul",
+  "setupType": "string - pl. 'Gamer Setup', 'Produktív Home Office', 'Kreatív Stúdió' stb.",
+  "productIds": [number array - max 8 releváns termék ID a legjobbtól],
+  "matchScores": [number array - 60-100 közötti match pontszámok],
+  "techReasons": [string array - rövid tech indoklás magyarul minden termékhez, pl. 'RTX 4060 ideális 1080p gaminghez'],
+  "bundles": [
+    {
+      "name": "Csomag neve - pl. 'Alap Gaming Csomag'",
+      "description": "Rövid leírás",
+      "productIds": [number array - 2-5 összeillő termék],
+      "savings": number - megtakarítás Ft-ban ha van
+    }
+  ],
+  "tips": ["string array - 3-5 tech tipp a felhasználási területhez"],
+  "futureUpgrades": ["string array - 2-3 jövőbeli fejlesztési javaslat"]
+}`
+        },
+        {
+          role: 'user',
+          content: `Tech igények:
+- Felhasználás: ${useCaseLabels[preferences.useCase] || preferences.useCase}
+- Prioritások: ${preferences.priority.map(p => priorityLabels[p] || p).join(', ')}
+- Költségkeret: ${preferences.budget}
+- Tapasztalat: ${preferences.experienceLevel}
+${preferences.ecosystem ? `- Ökoszisztéma: ${preferences.ecosystem}` : ''}
+
+Elérhető termékek:
+${products.map(p => `ID: ${p.id}, ${p.name}, ${p.category}, ${(p.salePrice || p.price).toLocaleString()} Ft`).join('\n')}
+
+Adj tech ajánlásokat és állíts össze csomagokat!`
+        }
+      ],
+      temperature: 0.6,
+      max_tokens: 1500
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    // Build recommendations
+    const recommendations = (aiResult.productIds || []).map((id: number, idx: number) => {
+      const product = products.find(p => p.id === id)
+      if (!product) return null
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        price: product.salePrice || product.price,
+        image: product.image,
+        category: product.category,
+        matchScore: aiResult.matchScores?.[idx] || 80,
+        techReason: aiResult.techReasons?.[idx] || ''
+      }
+    }).filter(Boolean)
+
+    // Build bundles
+    const bundles = (aiResult.bundles || []).map((bundle: { name: string; description: string; productIds: number[]; savings: number }) => {
+      const items = bundle.productIds.map(id => {
+        const product = products.find(p => p.id === id)
+        if (!product) return null
+        return {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          price: product.salePrice || product.price,
+          image: product.image
+        }
+      }).filter((item): item is NonNullable<typeof item> => item !== null)
+      
+      const totalPrice = items.reduce((sum, item) => sum + item.price, 0)
+      
+      return {
+        name: bundle.name,
+        description: bundle.description || '',
+        items,
+        totalPrice,
+        savings: bundle.savings || 0
+      }
+    })
+
+    return {
+      success: true,
+      result: {
+        profile: aiResult.profile || 'A tech profilod elemzés alatt...',
+        setupType: aiResult.setupType || 'Egyedi Setup',
+        recommendations,
+        bundles,
+        tips: aiResult.tips || [],
+        futureUpgrades: aiResult.futureUpgrades || []
+      }
+    }
+  } catch (error) {
+    console.error('Tech recommendations error:', error)
+    return { success: false, error: 'Hiba a tech elemzés során' }
+  }
+}
+
+// ============================================================================
+// AI SHOPPING LIST
+// ============================================================================
+
+interface ShoppingListItem {
+  id: string
+  name: string
+  quantity: number
+  priority: 'high' | 'medium' | 'low'
+}
+
+export async function optimizeShoppingList(items: ShoppingListItem[]) {
+  try {
+    // Find products matching list items
+    const products = await prisma.product.findMany({
+      where: {
+        isArchived: false,
+        stock: { gt: 0 }
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        salePrice: true,
+        image: true,
+        category: true
+      },
+      take: 100
+    })
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy tech bevásárlólista optimalizáló AI vagy egy elektronikai webshopban. Elemezd a kívánt tech eszközök listáját és találj jobb/olcsóbb alternatívákat.
+
+Válaszolj CSAK JSON formátumban:
+{
+  "totalOriginal": number,
+  "totalOptimized": number,
+  "suggestions": [
+    {
+      "originalItem": "string - eredeti tétel neve",
+      "betterProductId": number or null,
+      "reason": "string - miért jobb ez tech szempontból (pl. jobb specifikációk, újabb modell, kompatibilitás)"
+    }
+  ],
+  "purchaseOrder": ["string array - javasolt beszerzési sorrend, pl. először alaplap, utána CPU stb."],
+  "tips": ["string array - tech vásárlási tippek, pl. kompatibilitás, garancia, specifikációk"]
+}`
+        },
+        {
+          role: 'user',
+          content: `Tech bevásárlólista:
+${items.map(i => `- ${i.name} (${i.quantity}x, ${i.priority === 'high' ? 'Sürgős' : i.priority === 'medium' ? 'Normál' : 'Ráér'})`).join('\n')}
+
+Elérhető tech termékek:
+${products.map(p => `ID: ${p.id}, ${p.name}, ${p.category}, ${(p.salePrice || p.price).toLocaleString()} Ft`).join('\n')}
+
+Optimalizáld a tech listát és keress jobb specifikációjú/árú alternatívákat!`
+        }
+      ],
+      temperature: 0.6,
+      max_tokens: 1000
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    // Enrich suggestions with product data
+    const suggestions = (aiResult.suggestions || []).map((sug: { originalItem: string; betterProductId?: number; reason: string }) => {
+      const product = sug.betterProductId ? products.find(p => p.id === sug.betterProductId) : null
+      return {
+        originalItem: sug.originalItem,
+        betterProduct: product ? {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          price: product.salePrice || product.price,
+          image: product.image
+        } : undefined,
+        reason: sug.reason
+      }
+    })
+
+    return {
+      success: true,
+      optimization: {
+        totalOriginal: aiResult.totalOriginal || 0,
+        totalOptimized: aiResult.totalOptimized || 0,
+        savings: (aiResult.totalOriginal || 0) - (aiResult.totalOptimized || 0),
+        suggestions,
+        purchaseOrder: aiResult.purchaseOrder || [],
+        tips: aiResult.tips || []
+      }
+    }
+  } catch (error) {
+    console.error('Shopping list optimization error:', error)
+    return { success: false, error: 'Hiba az optimalizálás során' }
+  }
+}
+
+export async function findBestDealsForList(itemNames: string[]) {
+  try {
+    // Find products on sale that match list items
+    const products = await prisma.product.findMany({
+      where: {
+        isArchived: false,
+        stock: { gt: 0 },
+        salePrice: { not: null }
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        salePrice: true,
+        image: true,
+        category: true
+      },
+      orderBy: { salePrice: 'asc' },
+      take: 50
+    })
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy tech akciókereső AI vagy. Párosítsd a keresett tech eszközöket az aktuálisan akciós termékekkel.
+
+Válaszolj CSAK JSON formátumban:
+{
+  "matches": [
+    {
+      "itemName": "string - keresett tech eszköz neve",
+      "productId": number
+    }
+  ]
+}`
+        },
+        {
+          role: 'user',
+          content: `Keresett tech eszközök: ${itemNames.join(', ')}
+
+Akciós tech termékek:
+${products.map(p => `ID: ${p.id}, ${p.name}, ${p.category}, ${p.salePrice?.toLocaleString()} Ft (eredeti: ${p.price.toLocaleString()} Ft)`).join('\n')}
+
+Párosítsd a keresett eszközöket a legjobb akciós tech termékekkel!`
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 600
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    const deals = (aiResult.matches || []).map((match: { itemName: string; productId: number }) => {
+      const product = products.find(p => p.id === match.productId)
+      if (!product || !product.salePrice) return null
+      
+      const discount = Math.round((1 - product.salePrice / product.price) * 100)
+      
+      return {
+        itemName: match.itemName,
+        product: {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          price: product.salePrice,
+          originalPrice: product.price,
+          image: product.image,
+          discount
+        }
+      }
+    }).filter(Boolean)
+
+    return { success: true, deals }
+  } catch (error) {
+    console.error('Find deals error:', error)
+    return { success: false, error: 'Hiba az akciók keresésekor' }
+  }
+}
+
+// ============================================================================
+// AI COMPATIBILITY CHECKER
+// ============================================================================
+
+export async function checkCompatibility(productIds: number[]) {
+  try {
+    if (productIds.length < 2) {
+      return { success: false, error: 'Legalább 2 termék szükséges' }
+    }
+
+    // Fetch products with specifications
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        description: true,
+        specifications: true,
+        price: true,
+        salePrice: true
+      }
+    })
+
+    if (products.length < 2) {
+      return { success: false, error: 'Nem található elég termék' }
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy tech kompatibilitás ellenőrző AI vagy. Elemezd a megadott PC alkatrészeket/tech eszközöket és állapítsd meg, hogy kompatibilisek-e egymással.
+
+Figyelj ezekre:
+- CPU és alaplap socket kompatibilitás
+- RAM típus és sebesség támogatás
+- Tápegység teljesítmény
+- Fizikai méretek (pl. GPU hossz, hűtő magasság)
+- PCIe generációk
+- M.2 slot típusok
+
+Válaszolj CSAK JSON formátumban:
+{
+  "isCompatible": boolean,
+  "overallScore": number (0-100),
+  "issues": [
+    {
+      "severity": "error" | "warning" | "info",
+      "products": ["string array - érintett termékek"],
+      "message": "string - probléma leírása magyarul",
+      "suggestion": "string - megoldási javaslat"
+    }
+  ],
+  "bottlenecks": ["string array - teljesítmény szűk keresztmetszetek"],
+  "recommendations": [
+    {
+      "type": "upgrade" | "alternative" | "addition",
+      "message": "string - ajánlás magyarul"
+    }
+  ],
+  "powerRequirement": number (watt, ha releváns),
+  "summary": "string - rövid összefoglaló magyarul"
+}`
+        },
+        {
+          role: 'user',
+          content: `Ellenőrizd ezeket az alkatrészeket/eszközöket:
+
+${products.map(p => `Termék: ${p.name}
+Kategória: ${p.category}
+Leírás: ${(p.description || '').slice(0, 300)}
+Specifikációk: ${JSON.stringify(p.specifications || {})}
+---`).join('\n')}`
+        }
+      ],
+      temperature: 0.4,
+      max_tokens: 1200
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    return {
+      success: true,
+      result: {
+        isCompatible: aiResult.isCompatible ?? false,
+        overallScore: aiResult.overallScore ?? 0,
+        issues: aiResult.issues || [],
+        bottlenecks: aiResult.bottlenecks || [],
+        recommendations: aiResult.recommendations || [],
+        powerRequirement: aiResult.powerRequirement,
+        summary: aiResult.summary || ''
+      }
+    }
+  } catch (error) {
+    console.error('Compatibility check error:', error)
+    return { success: false, error: 'Hiba a kompatibilitás ellenőrzés során' }
+  }
+}
+
+// ============================================================================
+// AI UPGRADE ADVISOR
+// ============================================================================
+
+interface UpgradeInput {
+  currentSetup: Array<{ category: string; description: string }>
+  useCase: string
+  maxBudget: number
+}
+
+export async function getUpgradeRecommendations(input: UpgradeInput) {
+  try {
+    const { currentSetup, useCase, maxBudget } = input
+
+    // Get available products for upgrades
+    const products = await prisma.product.findMany({
+      where: {
+        isArchived: false,
+        stock: { gt: 0 },
+        OR: [
+          { price: { lte: maxBudget } },
+          { salePrice: { lte: maxBudget } }
+        ]
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        salePrice: true,
+        image: true,
+        category: true,
+        description: true,
+        specifications: true
+      },
+      take: 80
+    })
+
+    const useCaseLabels: Record<string, string> = {
+      'gaming': 'Gaming (magas FPS, jó grafika)',
+      'work': 'Munka és produktivitás (multitasking, office)',
+      'content': 'Tartalomgyártás (videó szerkesztés, renderelés)',
+      'mixed': 'Vegyes használat'
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Te egy PC/tech upgrade tanácsadó AI vagy. A felhasználó jelenlegi konfigurációja és felhasználási célja alapján adj fejlesztési javaslatokat.
+
+Válaszolj CSAK JSON formátumban:
+{
+  "analysis": "string - 2-3 mondatos elemzés a jelenlegi setupról",
+  "currentPerformance": number (0-100),
+  "potentialPerformance": number (0-100 a javasolt fejlesztésekkel),
+  "priorityUpgrades": [
+    {
+      "category": "string - pl. Videokártya, Processzor",
+      "urgency": "high" | "medium" | "low",
+      "reason": "string - miért fontos ez a fejlesztés",
+      "productIds": [number array - ajánlott termék ID-k],
+      "expectedImprovement": "string - pl. +50% FPS"
+    }
+  ],
+  "budgetOptions": [
+    {
+      "tier": "string - pl. Alap, Közép, Prémium",
+      "totalCost": number,
+      "productIds": [number array],
+      "performanceGain": number (százalékos növekedés)
+    }
+  ],
+  "tips": ["string array - általános tippek"],
+  "timeline": "string - ajánlott fejlesztési ütemezés"
+}`
+        },
+        {
+          role: 'user',
+          content: `Jelenlegi konfiguráció:
+${currentSetup.map(s => `- ${s.category}: ${s.description}`).join('\n')}
+
+Felhasználási cél: ${useCaseLabels[useCase] || useCase}
+Maximum költségkeret: ${maxBudget.toLocaleString('hu-HU')} Ft
+
+Elérhető termékek fejlesztéshez:
+${products.map(p => `ID: ${p.id}, ${p.name}, ${p.category}, ${(p.salePrice || p.price).toLocaleString()} Ft`).join('\n')}
+
+Adj részletes fejlesztési tervet!`
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 1500
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) throw new Error('No AI response')
+
+    const aiResult = JSON.parse(content.replace(/```json\n?|\n?```/g, ''))
+
+    // Build priority upgrades with products
+    const priorityUpgrades = (aiResult.priorityUpgrades || []).map((upgrade: {
+      category: string
+      urgency: 'high' | 'medium' | 'low'
+      reason: string
+      productIds: number[]
+      expectedImprovement: string
+    }) => ({
+      category: upgrade.category,
+      urgency: upgrade.urgency,
+      reason: upgrade.reason,
+      expectedImprovement: upgrade.expectedImprovement,
+      products: (upgrade.productIds || []).map((id: number) => {
+        const product = products.find(p => p.id === id)
+        if (!product) return null
+        return {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          price: product.salePrice || product.price,
+          image: product.image,
+          category: product.category,
+          improvementScore: 0,
+          reason: ''
+        }
+      }).filter(Boolean)
+    }))
+
+    // Build budget options
+    const budgetOptions = (aiResult.budgetOptions || []).map((option: {
+      tier: string
+      totalCost: number
+      productIds: number[]
+      performanceGain: number
+    }) => ({
+      tier: option.tier,
+      totalCost: option.totalCost,
+      performanceGain: option.performanceGain,
+      products: (option.productIds || []).map((id: number) => {
+        const product = products.find(p => p.id === id)
+        if (!product) return null
+        return {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          price: product.salePrice || product.price,
+          image: product.image,
+          category: product.category,
+          improvementScore: 0,
+          reason: ''
+        }
+      }).filter(Boolean)
+    }))
+
+    return {
+      success: true,
+      result: {
+        analysis: aiResult.analysis || '',
+        currentPerformance: aiResult.currentPerformance || 50,
+        potentialPerformance: aiResult.potentialPerformance || 80,
+        priorityUpgrades,
+        budgetOptions,
+        tips: aiResult.tips || [],
+        timeline: aiResult.timeline || ''
+      }
+    }
+  } catch (error) {
+    console.error('Upgrade recommendations error:', error)
+    return { success: false, error: 'Hiba az upgrade elemzés során' }
+  }
+}

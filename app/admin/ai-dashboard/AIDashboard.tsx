@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw, Brain, Wand2, BarChart3, LineChart, AlertTriangle, Layers, DollarSign, FileText, UserX, Gift } from 'lucide-react'
+import { Bot, MessageSquare, ShoppingCart, TrendingUp, Users, Clock, Search, Package, Sparkles, ArrowUp, ArrowDown, RefreshCw, Brain, Wand2, BarChart3, LineChart, AlertTriangle, Layers, DollarSign, FileText, UserX, Gift, RotateCcw, Tag, PackageSearch } from 'lucide-react'
 import { motion } from 'framer-motion'
 import AIInsightsPanel from '../components/AIInsightsPanel'
 import AIMarketingAssistant from '../components/AIMarketingAssistant'
@@ -16,6 +16,9 @@ import AIPriceOptimizer from '../components/AIPriceOptimizer'
 import AIContentStudio from '../components/AIContentStudio'
 import AIChurnPrediction from '../components/AIChurnPrediction'
 import AISmartBundler from '../components/AISmartBundler'
+import AIReturnPredictor from '../components/AIReturnPredictor'
+import AIAutoTagging from '../components/AIAutoTagging'
+import AIInventoryPredictor from '../components/AIInventoryPredictor'
 import { getAIStats } from '@/lib/actions/ai-actions'
 
 interface ChatStats {
@@ -67,7 +70,7 @@ export default function AIDashboard() {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d')
-  const [activeTab, setActiveTab] = useState<'stats' | 'insights' | 'marketing' | 'analyzer' | 'forecast' | 'segments' | 'anomaly' | 'inventory' | 'seo' | 'responses' | 'pricing' | 'content' | 'churn' | 'bundles'>('stats')
+  const [activeTab, setActiveTab] = useState<'stats' | 'insights' | 'marketing' | 'analyzer' | 'forecast' | 'segments' | 'anomaly' | 'inventory' | 'seo' | 'responses' | 'pricing' | 'content' | 'churn' | 'bundles' | 'returns' | 'tagging' | 'stockforecast'>('stats')
 
   useEffect(() => {
     fetchStats()
@@ -384,6 +387,39 @@ export default function AIDashboard() {
           <Gift size={16} />
           Smart Bundler
         </button>
+        <button
+          onClick={() => setActiveTab('returns')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'returns'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <RotateCcw size={16} />
+          Visszáru Előrejelző
+        </button>
+        <button
+          onClick={() => setActiveTab('tagging')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'tagging'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Tag size={16} />
+          Auto Címkézés
+        </button>
+        <button
+          onClick={() => setActiveTab('stockforecast')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'stockforecast'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <PackageSearch size={16} />
+          Készlet Előrejelző
+        </button>
       </div>
 
       {activeTab === 'insights' ? (
@@ -412,6 +448,12 @@ export default function AIDashboard() {
         <AIChurnPrediction />
       ) : activeTab === 'bundles' ? (
         <AISmartBundler />
+      ) : activeTab === 'returns' ? (
+        <AIReturnPredictor />
+      ) : activeTab === 'tagging' ? (
+        <AIAutoTagging />
+      ) : activeTab === 'stockforecast' ? (
+        <AIInventoryPredictor />
       ) : (
         <>
           {/* Stats Grid */}

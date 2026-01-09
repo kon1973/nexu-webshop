@@ -15,6 +15,7 @@ import CountdownTimer from '@/app/components/CountdownTimer'
 import AIReviewSummary from '@/app/components/AIReviewSummary'
 import AIProductQA from '@/app/components/AIProductQA'
 import AIPricePredictor from '@/app/components/AIPricePredictor'
+import AIPriceAlert from '@/app/components/AIPriceAlert'
 import type { Product, Review } from '@prisma/client'
 import { getImageUrl } from '@/lib/image'
 import { createPortal } from 'react-dom'
@@ -547,11 +548,17 @@ export default function ProductDetailsClient({ product, url }: { product: Produc
             </div>
 
             {/* AI Price Prediction */}
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap gap-3">
               <AIPricePredictor 
                 productId={product.id} 
                 currentPrice={currentPrice || product.price}
                 originalPrice={originalPrice}
+              />
+              <AIPriceAlert
+                productId={product.id}
+                productName={product.name}
+                productImage={product.image}
+                currentPrice={currentPrice || product.price}
               />
             </div>
           </div>
