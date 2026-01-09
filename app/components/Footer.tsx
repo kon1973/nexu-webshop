@@ -77,6 +77,8 @@ export default function Footer({ settings }: FooterProps) {
               <li><Link href="/about" className="hover:text-blue-400 transition-colors">Rólunk</Link></li>
               <li><Link href="/contact" className="hover:text-blue-400 transition-colors">Kapcsolat</Link></li>
               <li><Link href="/faq" className="hover:text-blue-400 transition-colors">GYIK</Link></li>
+              <li><Link href="/gift-cards" className="hover:text-pink-400 transition-colors">🎁 Ajándékkártyák</Link></li>
+              <li><Link href="/track-order" className="hover:text-blue-400 transition-colors">📦 Rendelés követése</Link></li>
             </ul>
           </div>
 

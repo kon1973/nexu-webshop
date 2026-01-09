@@ -4,10 +4,11 @@ import { useFavorites } from '@/context/FavoritesContext'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import { useState, useEffect, useTransition } from 'react'
-import { ArrowLeft, HeartCrack, ShoppingCart, AlertTriangle, Tag, Sparkles, TrendingDown, Loader2, Share2 } from 'lucide-react'
+import { ArrowLeft, HeartCrack, ShoppingCart, AlertTriangle, Tag, Sparkles, TrendingDown, Loader2, Share2, Users } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ProductCard from '@/app/components/ProductCard'
 import AIWishlistAnalyzer from '@/app/components/AIWishlistAnalyzer'
+import WishlistSharing from '@/app/components/WishlistSharing'
 import { toast } from 'sonner'
 import { getRecommendationsForFavorites, checkFavoritesStock, checkPriceDrops, getPopularCategories } from './actions'
 import type { Product } from '@prisma/client'
@@ -287,6 +288,22 @@ export default function FavoritesPage() {
                   image: f.image || null
                 }))}
               />
+            </motion.div>
+
+            {/* Wishlist Sharing */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="mt-12"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-pink-500/20 p-2 rounded-lg">
+                  <Users className="text-pink-400" size={20} />
+                </div>
+                <h2 className="text-2xl font-bold">Megosztható kívánságlisták</h2>
+              </div>
+              <WishlistSharing />
             </motion.div>
 
             {/* Recommendations */}

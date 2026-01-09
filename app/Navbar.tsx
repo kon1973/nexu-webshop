@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback, memo } from 'react'
-import { Heart, ShoppingCart, User, LogOut, Search, ChevronDown, LayoutDashboard, Package, ArrowLeftRight, Menu, X, Home, Grid3X3, Settings, MapPin, Award, Sparkles } from 'lucide-react'
+import { Heart, ShoppingCart, User, LogOut, Search, ChevronDown, LayoutDashboard, Package, ArrowLeftRight, Menu, X, Home, Grid3X3, Settings, MapPin, Award, Sparkles, Gift, Truck } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useFavorites } from '@/context/FavoritesContext'
 import { useCompare } from '@/context/CompareContext'
@@ -461,6 +461,32 @@ export default function Navbar({ categories = [] }: { categories?: Category[] })
                       {favoriteCount}
                     </span>
                   )}
+                </Link>
+
+                <Link
+                  href="/gift-cards"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    isActivePath(pathname, '/gift-cards') 
+                      ? 'bg-pink-500/20 text-pink-400' 
+                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Gift size={20} />
+                  <span className="font-medium">Ajándékkártyák</span>
+                </Link>
+
+                <Link
+                  href="/track-order"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    isActivePath(pathname, '/track-order') 
+                      ? 'bg-blue-500/20 text-blue-400' 
+                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Truck size={20} />
+                  <span className="font-medium">Rendelés követése</span>
                 </Link>
 
                 <hr className="my-3 border-white/10" />
