@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { sendGiftCardEmail } from '@/lib/email'
 
 // Generate unique gift card code
 function generateGiftCardCode(): string {
@@ -148,8 +149,32 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    // TODO: Send email to recipient if delivery date is today or in past
-    // await sendGiftCardEmail(activatedCard)
+    // Send email to recipient if delivery date is today or in past
+    const shouldSendNow = deliveryDateParsed <= new Date()
+    if (shouldSendNow) {
+      try {
+        await sendGiftCardEmail({
+          recipientEmail,
+          recipientName,
+          senderName: senderName || undefined,
+          amount,
+          code,
+          message: message || undefined,
+          design: design || 'classic',
+          expiresAt
+        })
+        
+        // Update deliveredAt
+        await prisma.giftCard.update({
+          where: { id: activatedCard.id },
+          data: { deliveredAt: new Date() }
+        })
+      } catch (emailError) {
+        console.error('Failed to send gift card email:', emailError)
+        // Don't fail the request, the gift card is still created
+      }
+    }
+    // TODO: For future delivery dates, set up a cron job to send scheduled emails
 
     return NextResponse.json({
       success: true,

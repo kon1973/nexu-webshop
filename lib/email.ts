@@ -795,3 +795,162 @@ export async function sendPriceDropEmail(email: string, product: any) {
     return { success: false, error }
   }
 }
+
+// Gift Card Email Types and Function
+export type SendGiftCardEmailArgs = {
+  recipientEmail: string
+  recipientName: string
+  senderName?: string
+  amount: number
+  code: string
+  message?: string
+  design: string
+  expiresAt: Date
+}
+
+const designGradients: Record<string, { from: string; to: string; emoji: string }> = {
+  classic: { from: '#7c3aed', to: '#3b82f6', emoji: '🎁' },
+  birthday: { from: '#ec4899', to: '#f97316', emoji: '🎂' },
+  christmas: { from: '#dc2626', to: '#16a34a', emoji: '🎄' },
+  tech: { from: '#06b6d4', to: '#a855f7', emoji: '💻' },
+  minimal: { from: '#4b5563', to: '#1f2937', emoji: '✨' }
+}
+
+export async function sendGiftCardEmail({
+  recipientEmail,
+  recipientName,
+  senderName,
+  amount,
+  code,
+  message,
+  design,
+  expiresAt
+}: SendGiftCardEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.warn('RESEND_API_KEY is not set, skipping gift card email')
+    return { success: false, skipped: true }
+  }
+
+  const resend = new Resend(apiKey)
+  const siteUrl = getSiteUrl()
+  const shopUrl = `${siteUrl}/shop`
+  const from = process.env.EMAIL_FROM || 'NEXU Store <onboarding@resend.dev>'
+  
+  const colors = designGradients[design] || designGradients.classic
+  const formattedAmount = amount.toLocaleString('hu-HU')
+  const formattedExpiry = expiresAt.toLocaleDateString('hu-HU', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+  
+  const senderText = senderName ? `${escapeHtml(senderName)} küldött neked` : 'Valaki küldött neked'
+  const messageHtml = message 
+    ? `<div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:16px; margin:24px 0; font-style:italic; color:#d1d5db;">
+        "${escapeHtml(message)}"
+      </div>`
+    : ''
+
+  const subject = `${colors.emoji} NEXU Ajándékkártya érkezett: ${formattedAmount} Ft`
+
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0; padding:0; background:#0a0a0a; color:#ffffff; font-family: Arial, Helvetica, sans-serif;">
+    <div style="max-width:640px; margin:0 auto; padding:24px;">
+      <!-- Header -->
+      <div style="text-align:center; margin-bottom:24px;">
+        <span style="font-size:48px;">${colors.emoji}</span>
+        <h1 style="margin:16px 0 8px; font-size:28px; font-weight:bold; color:#ffffff;">
+          Ajándékkártyát kaptál!
+        </h1>
+        <p style="margin:0; color:#a3a3a3; font-size:16px;">
+          ${senderText} egy NEXU ajándékkártyát
+        </p>
+      </div>
+
+      <!-- Gift Card Visual -->
+      <div style="background:linear-gradient(135deg, ${colors.from}, ${colors.to}); border-radius:20px; padding:32px; position:relative; overflow:hidden; margin-bottom:24px;">
+        <div style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.15);"></div>
+        <div style="position:relative; z-index:1;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px;">
+            <div>
+              <p style="margin:0; font-size:12px; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:1px;">NEXU Ajándékkártya</p>
+              <p style="margin:8px 0 0; font-size:36px; font-weight:bold; color:#ffffff;">${formattedAmount} Ft</p>
+            </div>
+            <div style="font-size:32px; opacity:0.5;">🎁</div>
+          </div>
+          <div style="margin-top:24px;">
+            <p style="margin:0; font-size:12px; color:rgba(255,255,255,0.7);">Címzett</p>
+            <p style="margin:4px 0 0; font-size:18px; font-weight:600; color:#ffffff;">${escapeHtml(recipientName)}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Message -->
+      ${messageHtml}
+
+      <!-- Code Section -->
+      <div style="background:#121212; border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:24px; text-align:center; margin-bottom:24px;">
+        <p style="margin:0 0 12px; color:#a3a3a3; font-size:14px;">Az ajándékkártya kódod:</p>
+        <div style="background:#1a1a1a; border:2px dashed rgba(124,58,237,0.5); border-radius:12px; padding:16px; margin-bottom:16px;">
+          <p style="margin:0; font-size:28px; font-weight:bold; color:#ffffff; letter-spacing:3px; font-family:monospace;">${code}</p>
+        </div>
+        <p style="margin:0; color:#737373; font-size:12px;">
+          Másold be ezt a kódot fizetéskor a "Kuponkód" mezőbe
+        </p>
+      </div>
+
+      <!-- CTA Button -->
+      <div style="text-align:center; margin-bottom:24px;">
+        <a href="${shopUrl}" style="display:inline-block; background:linear-gradient(135deg, ${colors.from}, ${colors.to}); color:#ffffff; text-decoration:none; padding:16px 48px; border-radius:12px; font-weight:bold; font-size:16px;">
+          Vásárlás megkezdése →
+        </a>
+      </div>
+
+      <!-- Info Section -->
+      <div style="background:#121212; border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:20px; margin-bottom:24px;">
+        <h3 style="margin:0 0 16px; font-size:16px; color:#ffffff;">Hogyan használhatod?</h3>
+        <div style="color:#a3a3a3; font-size:14px; line-height:1.6;">
+          <p style="margin:0 0 12px;">1️⃣ Válogass a NEXU Webshop kínálatából</p>
+          <p style="margin:0 0 12px;">2️⃣ A fizetésnél add meg a fenti kódot</p>
+          <p style="margin:0;">3️⃣ Az összeg automatikusan levonásra kerül</p>
+        </div>
+      </div>
+
+      <!-- Expiry Notice -->
+      <div style="text-align:center; padding:16px; background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.2); border-radius:12px; margin-bottom:24px;">
+        <p style="margin:0; color:#fbbf24; font-size:14px;">
+          ⏰ Az ajándékkártya érvényes: <strong>${formattedExpiry}</strong>-ig
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div style="text-align:center; padding-top:24px; border-top:1px solid rgba(255,255,255,0.08);">
+        <p style="margin:0 0 8px; color:#737373; font-size:12px;">
+          Ha nincs még NEXU fiókod, nyugodtan regisztrálhatsz - 
+          az ajándékkártyád automatikusan megjelenik a profilodban!
+        </p>
+        <p style="margin:0; color:#525252; font-size:12px;">
+          © ${new Date().getFullYear()} NEXU Webshop • <a href="${siteUrl}" style="color:#7c3aed;">nexu.hu</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>`
+
+  try {
+    await resend.emails.send({
+      from,
+      to: recipientEmail,
+      subject,
+      html,
+    })
+    console.log(`Gift card email sent to ${recipientEmail}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Gift card email sending failed:', error)
+    return { success: false, error }
+  }
+}
+
